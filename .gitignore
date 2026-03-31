@@ -1,0 +1,12 @@
+# Environment variables
+.env
+
+# Binaries
+ttscli
+
+# OS specific files
+.DS_Store
+
+# Go workspaces
+go.work
+go.work.sum
