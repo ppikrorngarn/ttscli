@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/joho/godotenv"
 )
@@ -48,7 +49,7 @@ func main() {
 	// Parse CLI flags
 	textPtr := flag.String("text", "", "Text to convert to speech")
 	savePtr := flag.String("save", "", "Path to save the output MP3 file (e.g., output.mp3)")
-	playPtr := flag.Bool("play", false, "Play the audio immediately using macOS afplay")
+	playPtr := flag.Bool("play", false, "Play the audio immediately")
 	langPtr := flag.String("lang", "en-US", "Language code")
 	voicePtr := flag.String("voice", "en-US-Neural2-F", "Voice name")
 	listPtr := flag.Bool("list-voices", false, "List available voices (filtered by --lang)")
@@ -155,7 +156,7 @@ func synthesizeWithAPIKey(apiKey, text, languageCode, voiceName, audioEncoding s
 	return audioBytes, nil
 }
 
-// playAudio writes bytes to a temp file and plays it with macOS `afplay`
+// playAudio writes bytes to a temp file and plays it using OS-specific commands
 func playAudio(audioBytes []byte) error {
 	tmpDir := os.TempDir()
 	tmpFile := filepath.Join(tmpDir, "ttscli_temp.mp3")
@@ -165,7 +166,33 @@ func playAudio(audioBytes []byte) error {
 	}
 	defer os.Remove(tmpFile)
 
-	cmd := exec.Command("afplay", tmpFile)
+	var cmd *exec.Cmd
+
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("afplay", tmpFile)
+	case "linux":
+		// check if mpg123 is installed, fallback to paplay or ffplay
+		if _, err := exec.LookPath("mpg123"); err == nil {
+			cmd = exec.Command("mpg123", "-q", tmpFile)
+		} else if _, err := exec.LookPath("paplay"); err == nil {
+			cmd = exec.Command("paplay", tmpFile)
+		} else if _, err := exec.LookPath("ffplay"); err == nil {
+			cmd = exec.Command("ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", tmpFile)
+		} else {
+			return errors.New("no supported audio player found on Linux (try installing mpg123)")
+		}
+	case "windows":
+		// use powershell to play the file using System.Media.SoundPlayer
+		// Note: SoundPlayer might not support mp3 out of the box depending on Windows version,
+		// but typically we can use mplayer or a built-in media player trick.
+		// For simplicity, we can use an inline powershell script using Media.MediaPlayer
+		psScript := fmt.Sprintf(`(New-Object Media.SoundPlayer "%s").PlaySync()`, tmpFile)
+		cmd = exec.Command("powershell", "-c", psScript)
+	default:
+		return fmt.Errorf("unsupported platform for audio playback: %s", runtime.GOOS)
+	}
+
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()

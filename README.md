@@ -2,7 +2,7 @@
 
 A lightweight, fast Command Line Interface (CLI) written in Go to convert text into speech using the Google Cloud Text-to-Speech API. 
 
-This tool allows you to easily synthesize speech, save it to an MP3 file, or play it directly from your terminal on macOS.
+This tool allows you to easily synthesize speech, save it to an MP3 file, or play it directly from your terminal on macOS, Linux, and Windows.
 
 ## Prerequisites
 
@@ -10,6 +10,8 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
 2. **Google Cloud API Key:** You need an API key for the Google Cloud Text-to-Speech API.
    - Go to Google Cloud Console > APIs & Services > Credentials.
    - Create an API Key and restrict it to the "Cloud Text-to-Speech API".
+3. **Audio Player (Linux Only):** If you are running on Linux and want to use the `--play` flag, you need an audio player installed. The CLI looks for `mpg123`, `paplay`, or `ffplay`.
+   - Ubuntu/Debian: `sudo apt install mpg123`
 
 ## Setup
 
