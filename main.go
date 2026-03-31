@@ -36,6 +36,14 @@ type synthesizeResponse struct {
 	AudioContent string `json:"audioContent"`
 }
 
+type listVoicesResponse struct {
+	Voices []struct {
+		LanguageCodes []string `json:"languageCodes"`
+		Name          string   `json:"name"`
+		SsmlGender    string   `json:"ssmlGender"`
+	} `json:"voices"`
+}
+
 func main() {
 	// Parse CLI flags
 	textPtr := flag.String("text", "", "Text to convert to speech")
@@ -43,15 +51,18 @@ func main() {
 	playPtr := flag.Bool("play", false, "Play the audio immediately using macOS afplay")
 	langPtr := flag.String("lang", "en-US", "Language code")
 	voicePtr := flag.String("voice", "en-US-Neural2-F", "Voice name")
+	listPtr := flag.Bool("list-voices", false, "List available voices (filtered by --lang)")
+
+	// Customize the default help message
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "GCP Text-to-Speech CLI\n\nUsage:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nExamples:\n")
+		fmt.Fprintf(os.Stderr, "  ttscli --text \"Hello world\" --play\n")
+		fmt.Fprintf(os.Stderr, "  ttscli --list-voices --lang en-GB\n")
+	}
+
 	flag.Parse()
-
-	if *textPtr == "" {
-		exitErr(errors.New("please provide text using the --text flag"))
-	}
-
-	if *savePtr == "" && !*playPtr {
-		exitErr(errors.New("please specify either --save <path> or --play (or both)"))
-	}
 
 	// Load .env file if it exists, ignoring errors if it doesn't
 	_ = godotenv.Load()
@@ -59,6 +70,21 @@ func main() {
 	apiKey := os.Getenv("GOOGLE_API_KEY")
 	if apiKey == "" {
 		exitErr(errors.New("GOOGLE_API_KEY environment variable is not set"))
+	}
+
+	if *listPtr {
+		if err := fetchAndPrintVoices(apiKey, *langPtr); err != nil {
+			exitErr(fmt.Errorf("failed to list voices: %w", err))
+		}
+		return
+	}
+
+	if *textPtr == "" {
+		exitErr(errors.New("please provide text using the --text flag"))
+	}
+
+	if *savePtr == "" && !*playPtr {
+		exitErr(errors.New("please specify either --save <path> or --play (or both)"))
 	}
 
 	fmt.Println("Synthesizing speech...")
@@ -148,4 +174,36 @@ func playAudio(audioBytes []byte) error {
 func exitErr(err error) {
 	fmt.Fprintln(os.Stderr, "Error:", err)
 	os.Exit(1)
+}
+
+func fetchAndPrintVoices(apiKey, langCode string) error {
+	urlStr := "https://texttospeech.googleapis.com/v1/voices?key=" + apiKey
+	if langCode != "" {
+		urlStr += "&languageCode=" + langCode
+	}
+
+	resp, err := http.Get(urlStr)
+	if err != nil {
+		return fmt.Errorf("http get: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return fmt.Errorf("status=%d body=%s", resp.StatusCode, string(body))
+	}
+
+	var parsed listVoicesResponse
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	fmt.Printf("Available voices for language: %s\n", langCode)
+	fmt.Printf("%-35s | %-10s | %s\n", "VOICE NAME", "GENDER", "LANGUAGES")
+	fmt.Println("----------------------------------------------------------------------")
+	for _, v := range parsed.Voices {
+		fmt.Printf("%-35s | %-10s | %v\n", v.Name, v.SsmlGender, v.LanguageCodes)
+	}
+
+	return nil
 }
