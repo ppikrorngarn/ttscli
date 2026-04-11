@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -11,11 +12,13 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/joho/godotenv"
 )
+
+const defaultHTTPTimeout = 30 * time.Second
 
 type synthesizeRequest struct {
 	Input struct {
@@ -124,13 +127,14 @@ func synthesizeWithAPIKey(apiKey, text, languageCode, voiceName, audioEncoding s
 	}
 
 	url := "https://texttospeech.googleapis.com/v1/text:synthesize?key=" + apiKey
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewReader(b))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{Timeout: defaultHTTPTimeout}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("http call: %w", err)
 	}
@@ -158,27 +162,34 @@ func synthesizeWithAPIKey(apiKey, text, languageCode, voiceName, audioEncoding s
 
 // playAudio writes bytes to a temp file and plays it using OS-specific commands
 func playAudio(audioBytes []byte) error {
-	tmpDir := os.TempDir()
-	tmpFile := filepath.Join(tmpDir, "ttscli_temp.mp3")
+	tmpFile, err := os.CreateTemp("", "ttscli-*.mp3")
+	if err != nil {
+		return fmt.Errorf("create temp file: %w", err)
+	}
+	tmpFilePath := tmpFile.Name()
+	defer os.Remove(tmpFilePath)
 
-	if err := os.WriteFile(tmpFile, audioBytes, 0o600); err != nil {
+	if _, err := tmpFile.Write(audioBytes); err != nil {
+		_ = tmpFile.Close()
 		return fmt.Errorf("write temp file: %w", err)
 	}
-	defer os.Remove(tmpFile)
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("close temp file: %w", err)
+	}
 
 	var cmd *exec.Cmd
 
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.Command("afplay", tmpFile)
+		cmd = exec.Command("afplay", tmpFilePath)
 	case "linux":
 		// check if mpg123 is installed, fallback to paplay or ffplay
 		if _, err := exec.LookPath("mpg123"); err == nil {
-			cmd = exec.Command("mpg123", "-q", tmpFile)
+			cmd = exec.Command("mpg123", "-q", tmpFilePath)
 		} else if _, err := exec.LookPath("paplay"); err == nil {
-			cmd = exec.Command("paplay", tmpFile)
+			cmd = exec.Command("paplay", tmpFilePath)
 		} else if _, err := exec.LookPath("ffplay"); err == nil {
-			cmd = exec.Command("ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", tmpFile)
+			cmd = exec.Command("ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", tmpFilePath)
 		} else {
 			return errors.New("no supported audio player found on Linux (try installing mpg123)")
 		}
@@ -187,7 +198,7 @@ func playAudio(audioBytes []byte) error {
 		// Note: SoundPlayer might not support mp3 out of the box depending on Windows version,
 		// but typically we can use mplayer or a built-in media player trick.
 		// For simplicity, we can use an inline powershell script using Media.MediaPlayer
-		psScript := fmt.Sprintf(`(New-Object Media.SoundPlayer "%s").PlaySync()`, tmpFile)
+		psScript := fmt.Sprintf(`(New-Object Media.SoundPlayer "%s").PlaySync()`, tmpFilePath)
 		cmd = exec.Command("powershell", "-c", psScript)
 	default:
 		return fmt.Errorf("unsupported platform for audio playback: %s", runtime.GOOS)
@@ -209,9 +220,15 @@ func fetchAndPrintVoices(apiKey, langCode string) error {
 		urlStr += "&languageCode=" + langCode
 	}
 
-	resp, err := http.Get(urlStr)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, urlStr, nil)
 	if err != nil {
-		return fmt.Errorf("http get: %w", err)
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	client := &http.Client{Timeout: defaultHTTPTimeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("http call: %w", err)
 	}
 	defer resp.Body.Close()
 

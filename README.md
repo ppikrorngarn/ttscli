@@ -15,14 +15,19 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
 
 ## Setup
 
-1. **Clone the repository and build the binary:**
+1. **Install the CLI:**
+   ```bash
+   go install github.com/ppikrorngarn/ttscli@latest
+   ```
+
+2. **Or clone the repository and build the binary locally:**
    You can use the provided Makefile to build the project easily:
    ```bash
    make build
    ```
    *(Or run `go build -o ttscli .` directly).*
 
-2. **Configure your API Key:**
+3. **Configure your API Key:**
    Create a `.env` file in the root of the project and add your API key:
    ```env
    TTSCLI_GOOGLE_API_KEY="your_api_key_here"
@@ -92,4 +97,5 @@ A `Makefile` is included to simplify common development tasks.
 - `make build` - Compiles the Go binary into `ttscli`.
 - `make clean` - Removes the compiled binary and any generated `.mp3` files in the directory.
 - `make run ARGS="..."` - Builds and runs the CLI, passing arguments to it (e.g., `make run ARGS="--list-voices"`).
+- `make test` - Runs Go tests.
 - `make help` - Displays a list of all available make commands.
