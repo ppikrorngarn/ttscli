@@ -25,9 +25,9 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
 2. **Configure your API Key:**
    Create a `.env` file in the root of the project and add your API key:
    ```env
-   GOOGLE_API_KEY="your_api_key_here"
+   TTSCLI_GOOGLE_API_KEY="your_api_key_here"
    ```
-   *(Alternatively, you can export it in your terminal: `export GOOGLE_API_KEY="your_api_key_here"`)*
+   *(Alternatively, you can export it in your terminal: `export TTSCLI_GOOGLE_API_KEY="your_api_key_here"`)*
 
 ## Usage
 
