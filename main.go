@@ -68,9 +68,9 @@ func main() {
 	// Load .env file if it exists, ignoring errors if it doesn't
 	_ = godotenv.Load()
 
-	apiKey := os.Getenv("GOOGLE_API_KEY")
+	apiKey := os.Getenv("TTSCLI_GOOGLE_API_KEY")
 	if apiKey == "" {
-		exitErr(errors.New("GOOGLE_API_KEY environment variable is not set"))
+		exitErr(errors.New("TTSCLI_GOOGLE_API_KEY environment variable is not set"))
 	}
 
 	if *listPtr {
