@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -79,22 +80,20 @@ func (c *Client) Synthesize(ctx context.Context, text, languageCode, voiceName, 
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	url := c.baseURL + apiPathSynthesize + "?key=" + c.apiKey
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	reqURL, err := c.buildRequestURL(apiPathSynthesize, url.Values{})
+	if err != nil {
+		return nil, fmt.Errorf("build request url: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewReader(payload))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	body, err := c.do(req)
 	if err != nil {
-		return nil, fmt.Errorf("http call: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, fmt.Errorf("status=%d body=%s", resp.StatusCode, string(body))
+		return nil, err
 	}
 
 	var parsed synthesizeResponse
@@ -113,25 +112,24 @@ func (c *Client) Synthesize(ctx context.Context, text, languageCode, voiceName, 
 }
 
 func (c *Client) ListVoices(ctx context.Context, langCode string) ([]Voice, error) {
-	url := c.baseURL + apiPathVoices + "?key=" + c.apiKey
+	extraParams := url.Values{}
 	if langCode != "" {
-		url += "&languageCode=" + langCode
+		extraParams.Set("languageCode", langCode)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	reqURL, err := c.buildRequestURL(apiPathVoices, extraParams)
+	if err != nil {
+		return nil, fmt.Errorf("build request url: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
-	resp, err := c.httpClient.Do(req)
+	body, err := c.do(req)
 	if err != nil {
-		return nil, fmt.Errorf("http call: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, fmt.Errorf("status=%d body=%s", resp.StatusCode, string(body))
+		return nil, err
 	}
 
 	var parsed listVoicesResponse
@@ -140,6 +138,44 @@ func (c *Client) ListVoices(ctx context.Context, langCode string) ([]Voice, erro
 	}
 
 	return parsed.Voices, nil
+}
+
+func (c *Client) buildRequestURL(path string, extraParams url.Values) (string, error) {
+	baseURL, err := url.Parse(c.baseURL)
+	if err != nil {
+		return "", err
+	}
+
+	params := url.Values{}
+	params.Set("key", c.apiKey)
+	for k, values := range extraParams {
+		for _, v := range values {
+			params.Add(k, v)
+		}
+	}
+
+	ref := &url.URL{
+		Path:     path,
+		RawQuery: params.Encode(),
+	}
+	return baseURL.ResolveReference(ref).String(), nil
+}
+
+func (c *Client) do(req *http.Request) ([]byte, error) {
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http call: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return nil, fmt.Errorf("status=%d body=%s", resp.StatusCode, string(body))
+	}
+	return body, nil
 }
 
 func PrintVoices(w io.Writer, langCode string, voices []Voice) {
