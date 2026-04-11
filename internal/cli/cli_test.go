@@ -55,7 +55,7 @@ func TestParseCLIArgsValidSynthesize(t *testing.T) {
 	if cfg.SavePath != "out.mp3" {
 		t.Fatalf("expected SavePath out.mp3, got %q", cfg.SavePath)
 	}
-	if cfg.Lang != "en-US" || cfg.Voice != "en-US-Neural2-F" {
+	if cfg.Lang != defaultLanguage || cfg.Voice != defaultVoice {
 		t.Fatalf("unexpected defaults: lang=%q voice=%q", cfg.Lang, cfg.Voice)
 	}
 }

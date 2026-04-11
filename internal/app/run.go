@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +13,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
+const apiKeyEnvVar = "TTSCLI_GOOGLE_API_KEY"
+
 func Run(args []string, stdout, stderr io.Writer) error {
 	cfg, err := cli.ParseArgs(args, stderr)
 	if err != nil {
@@ -23,9 +24,9 @@ func Run(args []string, stdout, stderr io.Writer) error {
 	// Load .env file if it exists, ignoring errors if it doesn't.
 	_ = godotenv.Load()
 
-	apiKey := os.Getenv("TTSCLI_GOOGLE_API_KEY")
+	apiKey := os.Getenv(apiKeyEnvVar)
 	if apiKey == "" {
-		return errors.New("TTSCLI_GOOGLE_API_KEY environment variable is not set")
+		return fmt.Errorf("%s environment variable is not set", apiKeyEnvVar)
 	}
 
 	client := tts.NewClient(apiKey, nil)
@@ -41,7 +42,7 @@ func Run(args []string, stdout, stderr io.Writer) error {
 	}
 
 	fmt.Fprintln(stdout, "Synthesizing speech...")
-	audioBytes, err := client.Synthesize(ctx, cfg.Text, cfg.Lang, cfg.Voice, "MP3")
+	audioBytes, err := client.Synthesize(ctx, cfg.Text, cfg.Lang, cfg.Voice, tts.AudioEncodingMP3)
 	if err != nil {
 		return fmt.Errorf("failed to synthesize: %w", err)
 	}

@@ -7,6 +7,15 @@ import (
 	"strings"
 )
 
+const (
+	appName           = "ttscli"
+	defaultLanguage   = "en-US"
+	defaultVoice      = "en-US-Neural2-F"
+	helpTitle         = "GCP Text-to-Speech CLI"
+	helpExampleSpeak  = `  ttscli --text "Hello world" --play`
+	helpExampleVoices = "  ttscli --list-voices --lang en-GB"
+)
+
 type Config struct {
 	Text       string
 	SavePath   string
@@ -18,25 +27,25 @@ type Config struct {
 
 func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 	cfg := Config{}
-	fs := flag.NewFlagSet("ttscli", flag.ContinueOnError)
+	fs := flag.NewFlagSet(appName, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
 	fs.StringVar(&cfg.Text, "text", "", "Text to convert to speech")
 	fs.StringVar(&cfg.SavePath, "save", "", "Path to save the output MP3 file (e.g., output.mp3)")
 	fs.BoolVar(&cfg.Play, "play", false, "Play the audio immediately")
-	fs.StringVar(&cfg.Lang, "lang", "en-US", "Language code")
-	fs.StringVar(&cfg.Voice, "voice", "en-US-Neural2-F", "Voice name")
+	fs.StringVar(&cfg.Lang, "lang", defaultLanguage, "Language code")
+	fs.StringVar(&cfg.Voice, "voice", defaultVoice, "Voice name")
 	fs.BoolVar(&cfg.ListVoices, "list-voices", false, "List available voices (filtered by --lang)")
 
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "GCP Text-to-Speech CLI")
+		fmt.Fprintln(stderr, helpTitle)
 		fmt.Fprintln(stderr)
 		fmt.Fprintln(stderr, "Usage:")
 		fs.PrintDefaults()
 		fmt.Fprintln(stderr)
 		fmt.Fprintln(stderr, "Examples:")
-		fmt.Fprintln(stderr, `  ttscli --text "Hello world" --play`)
-		fmt.Fprintln(stderr, "  ttscli --list-voices --lang en-GB")
+		fmt.Fprintln(stderr, helpExampleSpeak)
+		fmt.Fprintln(stderr, helpExampleVoices)
 	}
 
 	if err := fs.Parse(args); err != nil {

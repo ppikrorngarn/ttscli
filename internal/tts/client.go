@@ -11,8 +11,13 @@ import (
 	"time"
 )
 
-const googleTTSBaseURL = "https://texttospeech.googleapis.com"
-const defaultHTTPTimeout = 30 * time.Second
+const (
+	GoogleTTSBaseURL   = "https://texttospeech.googleapis.com"
+	defaultHTTPTimeout = 30 * time.Second
+	apiPathSynthesize  = "/v1/text:synthesize"
+	apiPathVoices      = "/v1/voices"
+	AudioEncodingMP3   = "MP3"
+)
 
 type Client struct {
 	baseURL    string
@@ -56,7 +61,7 @@ func NewClient(apiKey string, httpClient *http.Client) *Client {
 		client = &http.Client{Timeout: defaultHTTPTimeout}
 	}
 	return &Client{
-		baseURL:    googleTTSBaseURL,
+		baseURL:    GoogleTTSBaseURL,
 		apiKey:     apiKey,
 		httpClient: client,
 	}
@@ -74,7 +79,7 @@ func (c *Client) Synthesize(ctx context.Context, text, languageCode, voiceName, 
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	url := c.baseURL + "/v1/text:synthesize?key=" + c.apiKey
+	url := c.baseURL + apiPathSynthesize + "?key=" + c.apiKey
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
@@ -108,7 +113,7 @@ func (c *Client) Synthesize(ctx context.Context, text, languageCode, voiceName, 
 }
 
 func (c *Client) ListVoices(ctx context.Context, langCode string) ([]Voice, error) {
-	url := c.baseURL + "/v1/voices?key=" + c.apiKey
+	url := c.baseURL + apiPathVoices + "?key=" + c.apiKey
 	if langCode != "" {
 		url += "&languageCode=" + langCode
 	}

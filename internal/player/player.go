@@ -9,8 +9,10 @@ import (
 	"runtime"
 )
 
+const tempAudioPattern = "ttscli-*.mp3"
+
 func PlayAudio(audioBytes []byte, stdout, stderr io.Writer) error {
-	tmpFile, err := os.CreateTemp("", "ttscli-*.mp3")
+	tmpFile, err := os.CreateTemp("", tempAudioPattern)
 	if err != nil {
 		return fmt.Errorf("create temp file: %w", err)
 	}

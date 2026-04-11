@@ -15,7 +15,7 @@ func TestTTSClientSynthesizeSuccess(t *testing.T) {
 	audioB64 := base64.StdEncoding.EncodeToString(audio)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/text:synthesize" {
+		if r.URL.Path != apiPathSynthesize {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		if got := r.URL.Query().Get("key"); got != "k" {
@@ -29,7 +29,7 @@ func TestTTSClientSynthesizeSuccess(t *testing.T) {
 	c := NewClient("k", srv.Client())
 	c.baseURL = srv.URL
 
-	got, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", "MP3")
+	got, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
 	if err != nil {
 		t.Fatalf("Synthesize returned error: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestTTSClientSynthesizeErrorStatus(t *testing.T) {
 	c := NewClient("k", srv.Client())
 	c.baseURL = srv.URL
 
-	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", "MP3")
+	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
 	if err == nil || !strings.Contains(err.Error(), "status=400") {
 		t.Fatalf("expected status error, got: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestTTSClientSynthesizeInvalidBase64(t *testing.T) {
 	c := NewClient("k", srv.Client())
 	c.baseURL = srv.URL
 
-	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", "MP3")
+	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
 	if err == nil || !strings.Contains(err.Error(), "decode audioContent") {
 		t.Fatalf("expected decode error, got: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestTTSClientSynthesizeInvalidBase64(t *testing.T) {
 
 func TestTTSClientListVoicesSuccess(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/voices" {
+		if r.URL.Path != apiPathVoices {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		if got := r.URL.Query().Get("languageCode"); got != "en-GB" {
