@@ -2,7 +2,7 @@
 .env
 
 # Binaries
-ttscli
+/ttscli
 
 # OS specific files
 .DS_Store

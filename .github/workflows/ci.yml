@@ -35,4 +35,4 @@ jobs:
         run: go test ./...
 
       - name: Build
-        run: go build -o ttscli .
+        run: go build -o ttscli ./cmd/ttscli

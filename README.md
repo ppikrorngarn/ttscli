@@ -17,7 +17,7 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
 
 1. **Install the CLI:**
    ```bash
-   go install github.com/ppikrorngarn/ttscli@latest
+   go install github.com/ppikrorngarn/ttscli/cmd/ttscli@latest
    ```
 
 2. **Or clone the repository and build the binary locally:**
@@ -25,7 +25,7 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
    ```bash
    make build
    ```
-   *(Or run `go build -o ttscli .` directly).*
+   *(Or run `go build -o ttscli ./cmd/ttscli` directly).*
 
 3. **Configure your API Key:**
    Create a `.env` file in the root of the project and add your API key:

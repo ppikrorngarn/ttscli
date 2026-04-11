@@ -8,7 +8,7 @@ all: build
 ## build: Build the CLI binary
 build:
 	@echo "Building $(BINARY_NAME)..."
-	@go build -o $(BINARY_NAME) .
+	@go build -o $(BINARY_NAME) ./cmd/ttscli
 
 ## clean: Remove the compiled binary
 clean:
