@@ -13,8 +13,6 @@ import (
 	"github.com/ppikrorngarn/ttscli/internal/config"
 	"github.com/ppikrorngarn/ttscli/internal/player"
 	"github.com/ppikrorngarn/ttscli/internal/tts"
-
-	"github.com/joho/godotenv"
 )
 
 const apiKeyEnvVar = "TTSCLI_GOOGLE_API_KEY"
@@ -26,7 +24,6 @@ type ttsService interface {
 
 var (
 	parseArgs     = cli.ParseArgs
-	loadDotenv    = godotenv.Load
 	lookupEnv     = os.Getenv
 	newTTSClient  = func(apiKey string) ttsService { return tts.NewClient(apiKey, nil) }
 	loadDefaults  = config.LoadDefaults
@@ -45,9 +42,6 @@ func Run(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-
-	// Load .env file if it exists, ignoring errors if it doesn't.
-	_ = loadDotenv()
 
 	switch cfg.Mode {
 	case cli.ModeDefault:

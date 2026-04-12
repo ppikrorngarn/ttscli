@@ -34,7 +34,6 @@ func TestRunMissingAPIKeyEnv(t *testing.T) {
 	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
 		return cli.Config{Text: "hello", Play: true}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "" }
 
 	err := Run([]string{"--text", "hello", "--play"}, &bytes.Buffer{}, &bytes.Buffer{})
@@ -67,7 +66,6 @@ func TestRunListVoicesSuccess(t *testing.T) {
 	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
 		return cli.Config{ListVoices: true, Lang: "en-GB"}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "k" }
 
 	printCalled := false
@@ -102,7 +100,6 @@ func TestRunListVoicesError(t *testing.T) {
 	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
 		return cli.Config{ListVoices: true, Lang: "en-GB"}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "k" }
 	newTTSClient = func(apiKey string) ttsService {
 		return &fakeTTSClient{
@@ -128,7 +125,6 @@ func TestRunSynthesizeError(t *testing.T) {
 	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
 		return cli.Config{Text: "hello", Play: true, Lang: "en-US", Voice: "en-US-Neural2-F"}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "k" }
 	newTTSClient = func(apiKey string) ttsService {
 		return &fakeTTSClient{
@@ -152,7 +148,6 @@ func TestRunSaveError(t *testing.T) {
 	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
 		return cli.Config{Text: "hello", SavePath: "out.mp3", Lang: "en-US", Voice: "en-US-Neural2-F"}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "k" }
 	newTTSClient = func(apiKey string) ttsService {
 		return &fakeTTSClient{
@@ -179,7 +174,6 @@ func TestRunPlayError(t *testing.T) {
 	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
 		return cli.Config{Text: "hello", Play: true, Lang: "en-US", Voice: "en-US-Neural2-F"}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "k" }
 	newTTSClient = func(apiKey string) ttsService {
 		return &fakeTTSClient{
@@ -206,7 +200,6 @@ func TestRunSaveSuccess(t *testing.T) {
 	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
 		return cli.Config{Text: "hello", SavePath: "out.mp3", Lang: "en-US", Voice: "en-US-Neural2-F"}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "k" }
 	newTTSClient = func(apiKey string) ttsService {
 		return &fakeTTSClient{
@@ -250,7 +243,6 @@ func TestRunPlaySuccess(t *testing.T) {
 	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
 		return cli.Config{Text: "hello", Play: true, Lang: "en-US", Voice: "en-US-Neural2-F"}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "k" }
 	newTTSClient = func(apiKey string) ttsService {
 		return &fakeTTSClient{
@@ -291,7 +283,6 @@ func TestRunUsesAppContextForSynthesize(t *testing.T) {
 	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
 		return cli.Config{Text: "hello", Play: true, Lang: "en-US", Voice: "en-US-Neural2-F"}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "k" }
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -325,7 +316,6 @@ func TestRunCallsContextStop(t *testing.T) {
 	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
 		return cli.Config{Text: "hello", Play: true, Lang: "en-US", Voice: "en-US-Neural2-F"}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "k" }
 
 	stopCalled := false
@@ -357,7 +347,6 @@ func TestRunEndToEndFlowWithRealParseArgs(t *testing.T) {
 
 	// Use real CLI parsing to validate package wiring.
 	parseArgs = cli.ParseArgs
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "k" }
 	newAppCtx = func() (context.Context, context.CancelFunc) {
 		return context.Background(), func() {}
@@ -496,7 +485,6 @@ func TestRunDefaultSetValidatesAndSaves(t *testing.T) {
 			HasVoiceFlag:      true,
 		}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "k" }
 	loadDefaults = func() (config.Defaults, error) {
 		return config.Defaults{Lang: "en-US"}, nil
@@ -544,7 +532,6 @@ func TestRunDefaultSetAPIKeyValidatesProvidedKey(t *testing.T) {
 			HasAPIKeyFlag:     true,
 		}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "env-key" }
 	loadDefaults = func() (config.Defaults, error) {
 		return config.Defaults{Lang: "en-US", Voice: "en-US-Neural2-F", APIKey: "old-key"}, nil
@@ -595,7 +582,6 @@ func TestRunDefaultSetVoiceValidationError(t *testing.T) {
 			HasLangFlag:       true,
 		}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "k" }
 	newTTSClient = func(apiKey string) ttsService {
 		return &fakeTTSClient{
@@ -666,7 +652,6 @@ func TestRunUsesSavedAPIKeyWhenEnvMissing(t *testing.T) {
 			ListVoices: false,
 		}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "" }
 	loadDefaults = func() (config.Defaults, error) {
 		return config.Defaults{APIKey: "saved-key"}, nil
@@ -707,7 +692,6 @@ func TestRunEnvAPIKeyOverridesSavedKey(t *testing.T) {
 			ListVoices: false,
 		}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "env-key" }
 	loadDefaults = func() (config.Defaults, error) {
 		return config.Defaults{APIKey: "saved-key"}, nil
@@ -748,7 +732,6 @@ func TestRunUsesPersistedDefaultsWhenFlagsNotProvided(t *testing.T) {
 			ListVoices: false,
 		}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "k" }
 	loadDefaults = func() (config.Defaults, error) {
 		return config.Defaults{Voice: "en-US-Chirp3-HD-Achernar", Lang: "en-US"}, nil
@@ -790,7 +773,6 @@ func TestRunExplicitFlagsOverridePersistedDefaults(t *testing.T) {
 			HasLangFlag:  true,
 		}, nil
 	}
-	loadDotenv = func(...string) error { return nil }
 	lookupEnv = func(_ string) string { return "k" }
 	loadDefaults = func() (config.Defaults, error) {
 		return config.Defaults{Voice: "en-US-Chirp3-HD-Achernar", Lang: "en-US"}, nil
@@ -819,7 +801,6 @@ func TestRunExplicitFlagsOverridePersistedDefaults(t *testing.T) {
 
 func stubAppDeps() func() {
 	oldParseArgs := parseArgs
-	oldLoadDotenv := loadDotenv
 	oldLookupEnv := lookupEnv
 	oldNewTTSClient := newTTSClient
 	oldLoadDefaults := loadDefaults
@@ -836,7 +817,6 @@ func stubAppDeps() func() {
 
 	return func() {
 		parseArgs = oldParseArgs
-		loadDotenv = oldLoadDotenv
 		lookupEnv = oldLookupEnv
 		newTTSClient = oldNewTTSClient
 		loadDefaults = oldLoadDefaults

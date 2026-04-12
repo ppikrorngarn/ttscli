@@ -30,11 +30,14 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
    *(Or run `go build -o ttscli ./cmd/ttscli` directly).*
 
 3. **Configure your API Key:**
-   Create a `.env` file in the root of the project and add your API key:
-   ```env
-   TTSCLI_GOOGLE_API_KEY="your_api_key_here"
+   Save it once with:
+   ```bash
+   ./ttscli default set --api-key "your_api_key_here"
    ```
-   *(Alternatively, you can save it once with `./ttscli default set --api-key "your_api_key_here"` or export it in your terminal: `export TTSCLI_GOOGLE_API_KEY="your_api_key_here"`.)*
+   Or export it in your terminal for the current shell/session:
+   ```bash
+   export TTSCLI_GOOGLE_API_KEY="your_api_key_here"
+   ```
 
 ### Contributor Setup
 
@@ -166,7 +169,7 @@ For a full list of flags, use the `--help` command:
 ## Troubleshooting
 
 - `TTSCLI_GOOGLE_API_KEY environment variable is not set`:
-  set `TTSCLI_GOOGLE_API_KEY` in your shell/`.env` file, or save it with `ttscli default set --api-key ...`.
+  set `TTSCLI_GOOGLE_API_KEY` in your shell, or save it with `ttscli default set --api-key ...`.
 - `no supported audio player found on Linux`:
   install one of `mpg123`, `paplay`, or `ffplay`.
 - `failed to synthesize: status=... body=...`:
@@ -179,7 +182,7 @@ For a full list of flags, use the `--help` command:
 - `cmd/ttscli`: CLI entrypoint (`main`, `--version` handling).
 - `internal/app`: top-level application flow and dependency wiring.
 - `internal/cli`: flag parsing and argument validation.
-- `internal/config`: user-level persisted defaults (`voice`, `lang`).
+- `internal/config`: user-level persisted defaults (`voice`, `lang`, `apiKey`).
 - `internal/tts`: Google TTS client and response parsing.
 - `internal/player`: local audio playback across OS platforms.
 
