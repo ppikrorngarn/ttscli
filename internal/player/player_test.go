@@ -37,12 +37,65 @@ func TestBuildPlayCommandLinuxFallbackOrder(t *testing.T) {
 	}
 }
 
+func TestBuildPlayCommandLinuxPrefersMpg123(t *testing.T) {
+	lookPath := func(file string) (string, error) {
+		if file == "mpg123" {
+			return "/usr/bin/mpg123", nil
+		}
+		if file == "paplay" || file == "ffplay" {
+			return "/usr/bin/" + file, nil
+		}
+		return "", errors.New("missing")
+	}
+	cmd, err := buildPlayCommand("linux", "/tmp/a.mp3", lookPath)
+	if err != nil {
+		t.Fatalf("buildPlayCommand returned error: %v", err)
+	}
+	if filepath.Base(cmd.Path) != "mpg123" {
+		t.Fatalf("expected mpg123, got %q", cmd.Path)
+	}
+}
+
+func TestBuildPlayCommandLinuxFallsBackToPaplay(t *testing.T) {
+	lookPath := func(file string) (string, error) {
+		if file == "paplay" {
+			return "/usr/bin/paplay", nil
+		}
+		return "", errors.New("missing")
+	}
+	cmd, err := buildPlayCommand("linux", "/tmp/a.mp3", lookPath)
+	if err != nil {
+		t.Fatalf("buildPlayCommand returned error: %v", err)
+	}
+	if filepath.Base(cmd.Path) != "paplay" {
+		t.Fatalf("expected paplay, got %q", cmd.Path)
+	}
+}
+
 func TestBuildPlayCommandLinuxNoPlayers(t *testing.T) {
 	_, err := buildPlayCommand("linux", "/tmp/a.mp3", func(string) (string, error) {
 		return "", errors.New("missing")
 	})
 	if err == nil {
 		t.Fatal("expected error when no players are available")
+	}
+}
+
+func TestBuildPlayCommandWindowsWithSpaces(t *testing.T) {
+	cmd, err := buildPlayCommand("windows", `C:\Temp Dir\a b.mp3`, func(string) (string, error) {
+		return "", nil
+	})
+	if err != nil {
+		t.Fatalf("buildPlayCommand returned error: %v", err)
+	}
+	if filepath.Base(cmd.Path) != "powershell" {
+		t.Fatalf("expected powershell, got %q", cmd.Path)
+	}
+	if len(cmd.Args) < 3 {
+		t.Fatalf("unexpected powershell args: %#v", cmd.Args)
+	}
+	if got := cmd.Args[2]; !bytes.Contains([]byte(got), []byte(`C:\Temp Dir\a b.mp3`)) {
+		t.Fatalf("expected script to include file path, got %q", got)
 	}
 }
 

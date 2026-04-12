@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -227,4 +229,48 @@ func TestTTSClientBuildRequestURLEncodesQueryParams(t *testing.T) {
 	if got := parsed.Query().Get("languageCode"); got != "en US/TH" {
 		t.Fatalf("unexpected languageCode param: %q", got)
 	}
+}
+
+func TestTTSClientSynthesizeHTTPCallError(t *testing.T) {
+	c := NewClient("k", &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return nil, errors.New("network down")
+		}),
+	})
+	c.baseURL = "https://example.com"
+
+	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
+	if err == nil || !strings.Contains(err.Error(), "http call") {
+		t.Fatalf("expected http call error, got: %v", err)
+	}
+}
+
+func TestTTSClientSynthesizeReadResponseError(t *testing.T) {
+	c := NewClient("k", &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(errReader{}),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	})
+	c.baseURL = "https://example.com"
+
+	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
+	if err == nil || !strings.Contains(err.Error(), "read response") {
+		t.Fatalf("expected read response error, got: %v", err)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+type errReader struct{}
+
+func (errReader) Read(p []byte) (int, error) {
+	return 0, errors.New("read failed")
 }
