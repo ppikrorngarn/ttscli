@@ -8,24 +8,27 @@ import (
 )
 
 const (
-	appName           = "ttscli"
-	DefaultLanguage   = "en-US"
-	DefaultVoice      = "en-US-Neural2-F"
-	helpTitle         = "GCP Text-to-Speech CLI"
+	appName            = "ttscli"
+	DefaultLanguage    = "en-US"
+	DefaultVoice       = "en-US-Neural2-F"
+	helpTitle          = "GCP Text-to-Speech CLI"
 	helpUsageRun       = `  ttscli --text "Hello world" --play`
 	helpUsageList      = "  ttscli --list-voices --lang en-GB"
 	helpUsageSetup     = "  ttscli setup"
+	helpUsageDoctor    = "  ttscli doctor"
 	helpUsageDefault   = "  ttscli default <set|get|unset> [flags]"
-	helpExampleSpeak  = `  ttscli --text "Hello world" --play`
-	helpExampleVoices = "  ttscli --list-voices --lang en-GB"
+	helpExampleSpeak   = `  ttscli --text "Hello world" --play`
+	helpExampleVoices  = "  ttscli --list-voices --lang en-GB"
 	helpExampleSetup   = "  ttscli setup"
+	helpExampleDoctor  = "  ttscli doctor"
 	helpExampleDefault = "  ttscli default set --voice en-US-Chirp3-HD-Achernar --lang en-US"
-	ModeRun           = "run"
-	ModeDefault       = "default"
-	ModeSetup         = "setup"
-	DefaultSet        = "set"
-	DefaultGet        = "get"
-	DefaultUnset      = "unset"
+	ModeRun            = "run"
+	ModeDefault        = "default"
+	ModeSetup          = "setup"
+	ModeDoctor         = "doctor"
+	DefaultSet         = "set"
+	DefaultGet         = "get"
+	DefaultUnset       = "unset"
 )
 
 type Config struct {
@@ -54,6 +57,13 @@ func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 		}
 		return cfg, nil
 	}
+	if len(args) > 0 && args[0] == ModeDoctor {
+		cfg := Config{Mode: ModeDoctor}
+		if len(args) > 1 {
+			return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(args[1:], " "))
+		}
+		return cfg, nil
+	}
 
 	cfg := Config{}
 	cfg.Mode = ModeRun
@@ -72,6 +82,7 @@ func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 		fmt.Fprintln(stderr)
 		fmt.Fprintln(stderr, "Usage:")
 		fmt.Fprintln(stderr, helpUsageSetup)
+		fmt.Fprintln(stderr, helpUsageDoctor)
 		fmt.Fprintln(stderr, helpUsageDefault)
 		fmt.Fprintln(stderr, helpUsageRun)
 		fmt.Fprintln(stderr, helpUsageList)
@@ -82,6 +93,7 @@ func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 		fmt.Fprintln(stderr)
 		fmt.Fprintln(stderr, "Examples:")
 		fmt.Fprintln(stderr, helpExampleSetup)
+		fmt.Fprintln(stderr, helpExampleDoctor)
 		fmt.Fprintln(stderr, helpExampleDefault)
 		fmt.Fprintln(stderr, helpExampleSpeak)
 		fmt.Fprintln(stderr, helpExampleVoices)

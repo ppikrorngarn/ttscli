@@ -96,8 +96,9 @@ func TestParseCLIArgsHelp(t *testing.T) {
 	}
 	helpText := stderr.String()
 	if !strings.Contains(helpText, "ttscli setup") ||
+		!strings.Contains(helpText, "ttscli doctor") ||
 		!strings.Contains(helpText, "ttscli default <set|get|unset> [flags]") {
-		t.Fatalf("help text missing setup/default usage, got: %q", helpText)
+		t.Fatalf("help text missing setup/doctor/default usage, got: %q", helpText)
 	}
 }
 
@@ -204,6 +205,28 @@ func TestParseCLIArgsSetup(t *testing.T) {
 func TestParseCLIArgsSetupRejectsPositionalArgs(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := ParseArgs([]string{"setup", "extra"}, &stderr)
+	if err == nil {
+		t.Fatal("expected unexpected positional arguments error")
+	}
+	if !strings.Contains(err.Error(), "unexpected positional arguments") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseCLIArgsDoctor(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"doctor"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Mode != ModeDoctor {
+		t.Fatalf("expected mode %q, got %+v", ModeDoctor, cfg)
+	}
+}
+
+func TestParseCLIArgsDoctorRejectsPositionalArgs(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"doctor", "extra"}, &stderr)
 	if err == nil {
 		t.Fatal("expected unexpected positional arguments error")
 	}

@@ -84,17 +84,22 @@ You can run the CLI by executing the `./ttscli` binary.
 ./ttscli setup
 ```
 
-**2. Play audio immediately (without saving):**
+**2. Run diagnostics:**
+```bash
+./ttscli doctor
+```
+
+**3. Play audio immediately (without saving):**
 ```bash
 ./ttscli --text "Hello world, this is a test." --play
 ```
 
-**3. Save audio to a file:**
+**4. Save audio to a file:**
 ```bash
 ./ttscli --text "Save this to a file." --save output.mp3
 ```
 
-**4. Save and play:**
+**5. Save and play:**
 ```bash
 ./ttscli --text "Save and play." --save output.mp3 --play
 ```
@@ -170,6 +175,7 @@ Clear saved defaults:
 - Priority for API key:
   `TTSCLI_GOOGLE_API_KEY` (env) > saved API key (`ttscli default set --api-key ...`).
 - `default set` validates against Google TTS before saving.
+- `doctor` runs health checks for config readability, API key availability, API connectivity, and playback capability.
 
 ## Help
 

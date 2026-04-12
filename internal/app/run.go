@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 
@@ -24,18 +26,27 @@ type ttsService interface {
 	Synthesize(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error)
 }
 
+type doctorCheck struct {
+	name   string
+	ok     bool
+	detail string
+	hint   string
+}
+
 var (
-	parseArgs     = cli.ParseArgs
-	lookupEnv     = os.Getenv
-	newTTSClient  = func(apiKey string) ttsService { return tts.NewClient(apiKey, nil) }
-	loadDefaults  = config.LoadDefaults
-	saveDefaults  = config.SaveDefaults
-	clearDefaults = config.ClearDefaults
-	printVoices   = tts.PrintVoices
-	writeFile     = os.WriteFile
-	playAudio     = player.PlayAudio
+	parseArgs               = cli.ParseArgs
+	lookupEnv               = os.Getenv
+	currentGOOS             = func() string { return runtime.GOOS }
+	lookPathCmd             = exec.LookPath
+	newTTSClient            = func(apiKey string) ttsService { return tts.NewClient(apiKey, nil) }
+	loadDefaults            = config.LoadDefaults
+	saveDefaults            = config.SaveDefaults
+	clearDefaults           = config.ClearDefaults
+	printVoices             = tts.PrintVoices
+	writeFile               = os.WriteFile
+	playAudio               = player.PlayAudio
 	setupInput    io.Reader = os.Stdin
-	newAppCtx     = func() (context.Context, context.CancelFunc) {
+	newAppCtx               = func() (context.Context, context.CancelFunc) {
 		return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	}
 )
@@ -51,6 +62,8 @@ func Run(args []string, stdout, stderr io.Writer) error {
 		return runDefaultCommand(cfg, stdout)
 	case cli.ModeSetup:
 		return runSetupCommand(stdout, stderr)
+	case cli.ModeDoctor:
+		return runDoctorCommand(stdout)
 	case "":
 		// For backward compatibility in tests that may stub ParseArgs manually.
 		cfg.Mode = cli.ModeRun
@@ -235,6 +248,102 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 	return nil
 }
 
+func runDoctorCommand(stdout io.Writer) error {
+	var checks []doctorCheck
+
+	defaults, defaultsErr := loadDefaults()
+	if defaultsErr != nil {
+		checks = append(checks, doctorCheck{
+			name:   "Saved config",
+			ok:     false,
+			detail: defaultsErr.Error(),
+			hint:   "Run \"ttscli default unset\" to clear invalid config, then run \"ttscli setup\".",
+		})
+	} else {
+		checks = append(checks, doctorCheck{
+			name:   "Saved config",
+			ok:     true,
+			detail: "config file is readable",
+		})
+	}
+
+	envKey := strings.TrimSpace(lookupEnv(apiKeyEnvVar))
+	savedKey := ""
+	if defaultsErr == nil {
+		savedKey = strings.TrimSpace(defaults.APIKey)
+	}
+
+	apiKey := ""
+	apiKeySource := ""
+	switch {
+	case envKey != "":
+		apiKey = envKey
+		apiKeySource = apiKeyEnvVar
+	case savedKey != "":
+		apiKey = savedKey
+		apiKeySource = "saved config"
+	}
+
+	if apiKey == "" {
+		checks = append(checks, doctorCheck{
+			name:   "API key availability",
+			ok:     false,
+			detail: "no API key found in environment or saved defaults",
+			hint:   fmt.Sprintf("Run \"ttscli default set --api-key <key>\" or export %s.", apiKeyEnvVar),
+		})
+		checks = append(checks, doctorCheck{
+			name:   "API connectivity",
+			ok:     false,
+			detail: "skipped: missing API key",
+			hint:   fmt.Sprintf("Configure API key first via \"ttscli setup\" or %s.", apiKeyEnvVar),
+		})
+	} else {
+		checks = append(checks, doctorCheck{
+			name:   "API key availability",
+			ok:     true,
+			detail: fmt.Sprintf("API key found via %s", apiKeySource),
+		})
+
+		ctx, stop := newAppCtx()
+		client := newTTSClient(apiKey)
+		voices, err := client.ListVoices(ctx, cli.DefaultLanguage)
+		stop()
+		if err != nil {
+			checks = append(checks, doctorCheck{
+				name:   "API connectivity",
+				ok:     false,
+				detail: err.Error(),
+				hint:   "Verify API key restrictions and Cloud Text-to-Speech API enablement.",
+			})
+		} else if len(voices) == 0 {
+			checks = append(checks, doctorCheck{
+				name:   "API connectivity",
+				ok:     false,
+				detail: "connected but returned no voices",
+				hint:   "Check API permissions and account/project status.",
+			})
+		} else {
+			checks = append(checks, doctorCheck{
+				name:   "API connectivity",
+				ok:     true,
+				detail: fmt.Sprintf("successfully listed %d voices for %s", len(voices), cli.DefaultLanguage),
+			})
+		}
+	}
+
+	playbackCheck := checkPlaybackCapability(currentGOOS(), lookPathCmd)
+	checks = append(checks, playbackCheck)
+
+	failed := printDoctorChecks(stdout, checks)
+	if failed > 0 {
+		fmt.Fprintf(stdout, "Doctor result: FAIL (%d failed)\n", failed)
+		return fmt.Errorf("doctor failed with %d check(s)", failed)
+	}
+
+	fmt.Fprintln(stdout, "Doctor result: OK")
+	return nil
+}
+
 func runDefaultUnset(cfg cli.Config, stdout io.Writer) error {
 	if !cfg.HasVoiceFlag && !cfg.HasLangFlag && !cfg.HasAPIKeyFlag {
 		if err := clearDefaults(); err != nil {
@@ -393,4 +502,71 @@ func promptYesNo(reader *bufio.Reader, stdout io.Writer, prompt string, defaultY
 			fmt.Fprintln(stdout, "Please answer y or n.")
 		}
 	}
+}
+
+func checkPlaybackCapability(goos string, lookPath func(file string) (string, error)) doctorCheck {
+	switch goos {
+	case "darwin":
+		if _, err := lookPath("afplay"); err != nil {
+			return doctorCheck{
+				name:   "Audio playback",
+				ok:     false,
+				detail: "required player command \"afplay\" not found",
+				hint:   "Install command-line audio playback support for macOS.",
+			}
+		}
+		return doctorCheck{name: "Audio playback", ok: true, detail: "found afplay"}
+	case "linux":
+		if _, err := lookPath("mpg123"); err == nil {
+			return doctorCheck{name: "Audio playback", ok: true, detail: "found mpg123"}
+		}
+		if _, err := lookPath("paplay"); err == nil {
+			return doctorCheck{name: "Audio playback", ok: true, detail: "found paplay"}
+		}
+		if _, err := lookPath("ffplay"); err == nil {
+			return doctorCheck{name: "Audio playback", ok: true, detail: "found ffplay"}
+		}
+		return doctorCheck{
+			name:   "Audio playback",
+			ok:     false,
+			detail: "no supported player found (mpg123, paplay, ffplay)",
+			hint:   "Install mpg123 (for example: sudo apt install mpg123).",
+		}
+	case "windows":
+		if _, err := lookPath("powershell"); err != nil {
+			if _, errExe := lookPath("powershell.exe"); errExe != nil {
+				return doctorCheck{
+					name:   "Audio playback",
+					ok:     false,
+					detail: "required player command \"powershell\" not found",
+					hint:   "Ensure PowerShell is available in PATH.",
+				}
+			}
+		}
+		return doctorCheck{name: "Audio playback", ok: true, detail: "found powershell"}
+	default:
+		return doctorCheck{
+			name:   "Audio playback",
+			ok:     false,
+			detail: fmt.Sprintf("unsupported platform: %s", goos),
+			hint:   "Audio playback is supported on macOS, Linux, and Windows.",
+		}
+	}
+}
+
+func printDoctorChecks(stdout io.Writer, checks []doctorCheck) int {
+	fmt.Fprintln(stdout, "Running doctor checks...")
+	failed := 0
+	for _, check := range checks {
+		status := "PASS"
+		if !check.ok {
+			status = "FAIL"
+			failed++
+		}
+		fmt.Fprintf(stdout, "[%s] %s: %s\n", status, check.name, check.detail)
+		if !check.ok && strings.TrimSpace(check.hint) != "" {
+			fmt.Fprintf(stdout, "  fix: %s\n", check.hint)
+		}
+	}
+	return failed
 }
