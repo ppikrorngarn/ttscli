@@ -13,10 +13,13 @@ const tempAudioPattern = "ttscli-*.mp3"
 
 var (
 	createTempFile = os.CreateTemp
+	writeTempFile  = func(f *os.File, audioBytes []byte) (int, error) { return f.Write(audioBytes) }
+	closeTempFile  = func(f *os.File) error { return f.Close() }
 	removeFile     = os.Remove
 	currentGOOS    = func() string { return runtime.GOOS }
 	lookPathCmd    = exec.LookPath
 	playCommand    = buildPlayCommand
+	runCommand     = func(cmd *exec.Cmd) error { return cmd.Run() }
 )
 
 func PlayAudio(audioBytes []byte, stdout, stderr io.Writer) error {
@@ -25,13 +28,17 @@ func PlayAudio(audioBytes []byte, stdout, stderr io.Writer) error {
 		return fmt.Errorf("create temp file: %w", err)
 	}
 	tmpFilePath := tmpFile.Name()
-	defer removeFile(tmpFilePath)
+	defer func() {
+		if err := removeFile(tmpFilePath); err != nil {
+			fmt.Fprintf(stderr, "warning: failed to remove temp file %s: %v\n", tmpFilePath, err)
+		}
+	}()
 
-	if _, err := tmpFile.Write(audioBytes); err != nil {
-		_ = tmpFile.Close()
+	if _, err := writeTempFile(tmpFile, audioBytes); err != nil {
+		_ = closeTempFile(tmpFile)
 		return fmt.Errorf("write temp file: %w", err)
 	}
-	if err := tmpFile.Close(); err != nil {
+	if err := closeTempFile(tmpFile); err != nil {
 		return fmt.Errorf("close temp file: %w", err)
 	}
 
@@ -41,7 +48,10 @@ func PlayAudio(audioBytes []byte, stdout, stderr io.Writer) error {
 	}
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
-	return cmd.Run()
+	if err := runCommand(cmd); err != nil {
+		return fmt.Errorf("run player command: %w", err)
+	}
+	return nil
 }
 
 func buildPlayCommand(goos, filePath string, lookPath func(file string) (string, error)) (*exec.Cmd, error) {

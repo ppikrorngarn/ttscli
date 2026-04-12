@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -136,18 +137,96 @@ func TestPlayAudioBuildCommandError(t *testing.T) {
 	}
 }
 
+func TestPlayAudioWriteTempError(t *testing.T) {
+	reset := stubPlayerDeps()
+	defer reset()
+
+	writeTempFile = func(_ *os.File, _ []byte) (int, error) {
+		return 0, errors.New("write failed")
+	}
+
+	err := PlayAudio([]byte("audio"), &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "write temp file") {
+		t.Fatalf("expected write temp file error, got: %v", err)
+	}
+}
+
+func TestPlayAudioCloseTempError(t *testing.T) {
+	reset := stubPlayerDeps()
+	defer reset()
+
+	closeCallCount := 0
+	closeTempFile = func(_ *os.File) error {
+		closeCallCount++
+		if closeCallCount == 1 {
+			return errors.New("close failed")
+		}
+		return nil
+	}
+
+	err := PlayAudio([]byte("audio"), &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "close temp file") {
+		t.Fatalf("expected close temp file error, got: %v", err)
+	}
+}
+
+func TestPlayAudioRunCommandError(t *testing.T) {
+	reset := stubPlayerDeps()
+	defer reset()
+
+	playCommand = func(goos, filePath string, lookPath func(file string) (string, error)) (*exec.Cmd, error) {
+		return exec.Command("echo"), nil
+	}
+	runCommand = func(_ *exec.Cmd) error {
+		return errors.New("run failed")
+	}
+
+	err := PlayAudio([]byte("audio"), &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "run player command") {
+		t.Fatalf("expected run player command error, got: %v", err)
+	}
+}
+
+func TestPlayAudioRemoveTempWarning(t *testing.T) {
+	reset := stubPlayerDeps()
+	defer reset()
+
+	playCommand = func(goos, filePath string, lookPath func(file string) (string, error)) (*exec.Cmd, error) {
+		return exec.Command("echo"), nil
+	}
+	runCommand = func(_ *exec.Cmd) error { return nil }
+	removeFile = func(_ string) error {
+		return errors.New("remove failed")
+	}
+
+	var stderr bytes.Buffer
+	err := PlayAudio([]byte("audio"), &bytes.Buffer{}, &stderr)
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+	if !strings.Contains(stderr.String(), "warning: failed to remove temp file") {
+		t.Fatalf("expected cleanup warning in stderr, got: %q", stderr.String())
+	}
+}
+
 func stubPlayerDeps() func() {
 	oldCreateTempFile := createTempFile
+	oldWriteTempFile := writeTempFile
+	oldCloseTempFile := closeTempFile
 	oldRemoveFile := removeFile
 	oldCurrentGOOS := currentGOOS
 	oldLookPathCmd := lookPathCmd
 	oldPlayCommand := playCommand
+	oldRunCommand := runCommand
 
 	return func() {
 		createTempFile = oldCreateTempFile
+		writeTempFile = oldWriteTempFile
+		closeTempFile = oldCloseTempFile
 		removeFile = oldRemoveFile
 		currentGOOS = oldCurrentGOOS
 		lookPathCmd = oldLookPathCmd
 		playCommand = oldPlayCommand
+		runCommand = oldRunCommand
 	}
 }
