@@ -45,6 +45,20 @@ func TestRunMissingAPIKeyEnv(t *testing.T) {
 	}
 }
 
+func TestRunParseArgsError(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
+		return cli.Config{}, errors.New("parse failed")
+	}
+
+	err := Run([]string{"--bad-flag"}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "parse failed") {
+		t.Fatalf("expected parse error passthrough, got: %v", err)
+	}
+}
+
 func TestRunListVoicesSuccess(t *testing.T) {
 	reset := stubAppDeps()
 	defer reset()
@@ -181,6 +195,91 @@ func TestRunPlayError(t *testing.T) {
 	err := Run([]string{"--text", "hello", "--play"}, &bytes.Buffer{}, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "failed to play audio") {
 		t.Fatalf("expected play error, got: %v", err)
+	}
+}
+
+func TestRunSaveSuccess(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
+		return cli.Config{Text: "hello", SavePath: "out.mp3", Lang: "en-US", Voice: "en-US-Neural2-F"}, nil
+	}
+	loadDotenv = func(...string) error { return nil }
+	lookupEnv = func(_ string) string { return "k" }
+	newTTSClient = func(apiKey string) ttsService {
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, langCode string) ([]tts.Voice, error) { return nil, nil },
+			synthesizeFn: func(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
+				return []byte("audio"), nil
+			},
+		}
+	}
+
+	writeCalled := false
+	writeFile = func(name string, data []byte, perm fs.FileMode) error {
+		writeCalled = true
+		if name != "out.mp3" {
+			t.Fatalf("unexpected save path: %s", name)
+		}
+		if string(data) != "audio" {
+			t.Fatalf("unexpected audio payload: %s", string(data))
+		}
+		return nil
+	}
+
+	var stdout bytes.Buffer
+	err := Run([]string{"--text", "hello", "--save", "out.mp3"}, &stdout, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if !writeCalled {
+		t.Fatal("expected writeFile to be called")
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "Synthesizing speech...") || !strings.Contains(out, "Saved audio to: out.mp3") {
+		t.Fatalf("unexpected stdout: %q", out)
+	}
+}
+
+func TestRunPlaySuccess(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
+		return cli.Config{Text: "hello", Play: true, Lang: "en-US", Voice: "en-US-Neural2-F"}, nil
+	}
+	loadDotenv = func(...string) error { return nil }
+	lookupEnv = func(_ string) string { return "k" }
+	newTTSClient = func(apiKey string) ttsService {
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, langCode string) ([]tts.Voice, error) { return nil, nil },
+			synthesizeFn: func(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
+				return []byte("audio"), nil
+			},
+		}
+	}
+
+	playCalled := false
+	playAudio = func(audioBytes []byte, stdout, stderr io.Writer) error {
+		playCalled = true
+		if string(audioBytes) != "audio" {
+			t.Fatalf("unexpected audio payload: %s", string(audioBytes))
+		}
+		return nil
+	}
+
+	var stdout bytes.Buffer
+	err := Run([]string{"--text", "hello", "--play"}, &stdout, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if !playCalled {
+		t.Fatal("expected playAudio to be called")
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "Synthesizing speech...") || !strings.Contains(out, "Playing audio...") {
+		t.Fatalf("unexpected stdout: %q", out)
 	}
 }
 
