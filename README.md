@@ -40,6 +40,18 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
 
 You can run the CLI by executing the `./ttscli` binary. 
 
+### Flags Reference
+
+| Flag | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `--text` | string | `""` | Required for synth mode (not required with `--list-voices` or `--version`). |
+| `--save` | string | `""` | Output MP3 path. |
+| `--play` | bool | `false` | Play synthesized audio immediately. |
+| `--lang` | string | `en-US` | Language code for synth/list. |
+| `--voice` | string | `en-US-Neural2-F` | Voice name for synth. |
+| `--list-voices` | bool | `false` | Lists voices (optionally filtered by `--lang`). |
+| `--version` | bool | `false` | Prints build metadata and exits. |
+
 ### Basic Commands
 
 **0. Show CLI version/build metadata:**
@@ -90,12 +102,36 @@ You can list all available voices for a specific language directly from the API.
 ./ttscli --list-voices --lang en-GB
 ```
 
+### Behavior Notes
+
+- Synthesize mode requires `--text` and at least one output mode: `--save` or `--play`.
+- `--list-voices` bypasses synth validation and does not require `--text`.
+- Press `Ctrl+C` to cancel in-flight API work gracefully.
+- On Linux, playback command priority is: `mpg123`, then `paplay`, then `ffplay`.
+
 ## Help
 
 For a full list of flags, use the `--help` command:
 ```bash
 ./ttscli --help
 ```
+
+## Troubleshooting
+
+- `TTSCLI_GOOGLE_API_KEY environment variable is not set`:
+  set `TTSCLI_GOOGLE_API_KEY` in your shell or `.env` file.
+- `no supported audio player found on Linux`:
+  install one of `mpg123`, `paplay`, or `ffplay`.
+- `failed to synthesize: status=... body=...`:
+  verify API key validity, API enablement, and key restrictions for Cloud Text-to-Speech API.
+
+## Project Structure
+
+- `cmd/ttscli`: CLI entrypoint (`main`, `--version` handling).
+- `internal/app`: top-level application flow and dependency wiring.
+- `internal/cli`: flag parsing and argument validation.
+- `internal/tts`: Google TTS client and response parsing.
+- `internal/player`: local audio playback across OS platforms.
 
 ## Makefile Commands
 
@@ -117,3 +153,12 @@ To build a release-like binary with explicit metadata:
 ```bash
 make build VERSION=v0.1.0 COMMIT=$(git rev-parse --short HEAD) DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 ```
+
+Sample version output:
+
+```bash
+./ttscli --version
+# ttscli version=v0.1.0 commit=abc1234 date=2026-04-12T12:00:00Z
+```
+
+Without explicit build metadata, local binaries show defaults (`version=dev`, `commit=none`, `date=unknown`).
