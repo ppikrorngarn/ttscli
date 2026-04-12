@@ -70,3 +70,14 @@ func TestParseCLIArgsHelp(t *testing.T) {
 		t.Fatalf("expected flag.ErrHelp, got %v", err)
 	}
 }
+
+func TestParseCLIArgsUnexpectedPositionalArgs(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"--text", "hello", "--play", "extra"}, &stderr)
+	if err == nil {
+		t.Fatal("expected unexpected positional arguments error")
+	}
+	if !strings.Contains(err.Error(), "unexpected positional arguments") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

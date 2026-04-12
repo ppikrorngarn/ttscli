@@ -1,7 +1,10 @@
 package player
 
 import (
+	"bytes"
 	"errors"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 )
@@ -49,5 +52,49 @@ func TestBuildPlayCommandUnsupportedOS(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected unsupported platform error")
+	}
+}
+
+func TestPlayAudioCreateTempError(t *testing.T) {
+	reset := stubPlayerDeps()
+	defer reset()
+
+	createTempFile = func(dir, pattern string) (*os.File, error) {
+		return nil, errors.New("create temp failed")
+	}
+
+	err := PlayAudio([]byte("audio"), &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("expected create temp file error")
+	}
+}
+
+func TestPlayAudioBuildCommandError(t *testing.T) {
+	reset := stubPlayerDeps()
+	defer reset()
+
+	playCommand = func(goos, filePath string, lookPath func(file string) (string, error)) (*exec.Cmd, error) {
+		return nil, errors.New("build command failed")
+	}
+
+	err := PlayAudio([]byte("audio"), &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("expected build command error")
+	}
+}
+
+func stubPlayerDeps() func() {
+	oldCreateTempFile := createTempFile
+	oldRemoveFile := removeFile
+	oldCurrentGOOS := currentGOOS
+	oldLookPathCmd := lookPathCmd
+	oldPlayCommand := playCommand
+
+	return func() {
+		createTempFile = oldCreateTempFile
+		removeFile = oldRemoveFile
+		currentGOOS = oldCurrentGOOS
+		lookPathCmd = oldLookPathCmd
+		playCommand = oldPlayCommand
 	}
 }

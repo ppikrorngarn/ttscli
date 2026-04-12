@@ -69,6 +69,38 @@ func TestTTSClientSynthesizeInvalidBase64(t *testing.T) {
 	}
 }
 
+func TestTTSClientSynthesizeInvalidJSON(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{invalid-json`)
+	}))
+	defer srv.Close()
+
+	c := NewClient("k", srv.Client())
+	c.baseURL = srv.URL
+
+	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
+	if err == nil || !strings.Contains(err.Error(), "unmarshal response") {
+		t.Fatalf("expected unmarshal error, got: %v", err)
+	}
+}
+
+func TestTTSClientSynthesizeEmptyAudioContent(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"audioContent":""}`)
+	}))
+	defer srv.Close()
+
+	c := NewClient("k", srv.Client())
+	c.baseURL = srv.URL
+
+	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
+	if err == nil || !strings.Contains(err.Error(), "empty audioContent") {
+		t.Fatalf("expected empty audioContent error, got: %v", err)
+	}
+}
+
 func TestTTSClientListVoicesSuccess(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != apiPathVoices {
@@ -90,5 +122,31 @@ func TestTTSClientListVoicesSuccess(t *testing.T) {
 	}
 	if len(voices) != 1 || voices[0].Name != "en-GB-Neural2-B" {
 		t.Fatalf("unexpected voices: %#v", voices)
+	}
+}
+
+func TestTTSClientListVoicesInvalidJSON(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{invalid-json`)
+	}))
+	defer srv.Close()
+
+	c := NewClient("k", srv.Client())
+	c.baseURL = srv.URL
+
+	_, err := c.ListVoices(context.Background(), "en-US")
+	if err == nil || !strings.Contains(err.Error(), "unmarshal response") {
+		t.Fatalf("expected unmarshal error, got: %v", err)
+	}
+}
+
+func TestTTSClientBuildRequestURLInvalidBaseURL(t *testing.T) {
+	c := NewClient("k", nil)
+	c.baseURL = "://invalid-base-url"
+
+	_, err := c.buildRequestURL(apiPathVoices, nil)
+	if err == nil {
+		t.Fatal("expected invalid base URL error")
 	}
 }

@@ -15,21 +15,36 @@ import (
 
 const apiKeyEnvVar = "TTSCLI_GOOGLE_API_KEY"
 
+type ttsService interface {
+	ListVoices(ctx context.Context, langCode string) ([]tts.Voice, error)
+	Synthesize(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error)
+}
+
+var (
+	parseArgs    = cli.ParseArgs
+	loadDotenv   = godotenv.Load
+	lookupEnv    = os.Getenv
+	newTTSClient = func(apiKey string) ttsService { return tts.NewClient(apiKey, nil) }
+	printVoices  = tts.PrintVoices
+	writeFile    = os.WriteFile
+	playAudio    = player.PlayAudio
+)
+
 func Run(args []string, stdout, stderr io.Writer) error {
-	cfg, err := cli.ParseArgs(args, stderr)
+	cfg, err := parseArgs(args, stderr)
 	if err != nil {
 		return err
 	}
 
 	// Load .env file if it exists, ignoring errors if it doesn't.
-	_ = godotenv.Load()
+	_ = loadDotenv()
 
-	apiKey := os.Getenv(apiKeyEnvVar)
+	apiKey := lookupEnv(apiKeyEnvVar)
 	if apiKey == "" {
 		return fmt.Errorf("%s environment variable is not set", apiKeyEnvVar)
 	}
 
-	client := tts.NewClient(apiKey, nil)
+	client := newTTSClient(apiKey)
 	ctx := context.Background()
 
 	if cfg.ListVoices {
@@ -37,7 +52,7 @@ func Run(args []string, stdout, stderr io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("failed to list voices: %w", err)
 		}
-		tts.PrintVoices(stdout, cfg.Lang, voices)
+		printVoices(stdout, cfg.Lang, voices)
 		return nil
 	}
 
@@ -48,7 +63,7 @@ func Run(args []string, stdout, stderr io.Writer) error {
 	}
 
 	if cfg.SavePath != "" {
-		if err := os.WriteFile(cfg.SavePath, audioBytes, 0o644); err != nil {
+		if err := writeFile(cfg.SavePath, audioBytes, 0o644); err != nil {
 			return fmt.Errorf("failed to save file: %w", err)
 		}
 		fmt.Fprintf(stdout, "Saved audio to: %s\n", cfg.SavePath)
@@ -56,7 +71,7 @@ func Run(args []string, stdout, stderr io.Writer) error {
 
 	if cfg.Play {
 		fmt.Fprintln(stdout, "Playing audio...")
-		if err := player.PlayAudio(audioBytes, stdout, stderr); err != nil {
+		if err := playAudio(audioBytes, stdout, stderr); err != nil {
 			return fmt.Errorf("failed to play audio: %w", err)
 		}
 	}

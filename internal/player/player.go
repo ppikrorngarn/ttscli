@@ -11,13 +11,21 @@ import (
 
 const tempAudioPattern = "ttscli-*.mp3"
 
+var (
+	createTempFile = os.CreateTemp
+	removeFile     = os.Remove
+	currentGOOS    = func() string { return runtime.GOOS }
+	lookPathCmd    = exec.LookPath
+	playCommand    = buildPlayCommand
+)
+
 func PlayAudio(audioBytes []byte, stdout, stderr io.Writer) error {
-	tmpFile, err := os.CreateTemp("", tempAudioPattern)
+	tmpFile, err := createTempFile("", tempAudioPattern)
 	if err != nil {
 		return fmt.Errorf("create temp file: %w", err)
 	}
 	tmpFilePath := tmpFile.Name()
-	defer os.Remove(tmpFilePath)
+	defer removeFile(tmpFilePath)
 
 	if _, err := tmpFile.Write(audioBytes); err != nil {
 		_ = tmpFile.Close()
@@ -27,7 +35,7 @@ func PlayAudio(audioBytes []byte, stdout, stderr io.Writer) error {
 		return fmt.Errorf("close temp file: %w", err)
 	}
 
-	cmd, err := buildPlayCommand(runtime.GOOS, tmpFilePath, exec.LookPath)
+	cmd, err := playCommand(currentGOOS(), tmpFilePath, lookPathCmd)
 	if err != nil {
 		return err
 	}
