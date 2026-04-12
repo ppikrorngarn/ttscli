@@ -20,7 +20,7 @@ clean:
 run: build
 	@./$(BINARY_NAME) $(ARGS)
 
-## test: Run tests (if any are added later)
+## test: Run tests
 test:
 	@go test -v ./...
 
