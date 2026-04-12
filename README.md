@@ -57,8 +57,8 @@ You can run the CLI by executing the `./ttscli` binary.
 | `--text` | string | `""` | Required for synth mode (not required with `--list-voices` or `--version`). |
 | `--save` | string | `""` | Output MP3 path. |
 | `--play` | bool | `false` | Play synthesized audio immediately. |
-| `--lang` | string | `en-US` | Language code for synth/list. |
-| `--voice` | string | `en-US-Neural2-F` | Voice name for synth. |
+| `--lang` | string | `en-US` | Language code for synth/list (or saved default, if configured). |
+| `--voice` | string | `en-US-Neural2-F` | Voice name for synth (or saved default, if configured). |
 | `--list-voices` | bool | `false` | Lists voices (optionally filtered by `--lang`). |
 | `--version` | bool | `false` | Prints build metadata and exits. |
 
@@ -112,12 +112,41 @@ You can list all available voices for a specific language directly from the API.
 ./ttscli --list-voices --lang en-GB
 ```
 
+### Persistent Defaults (NVM-like)
+
+Set user-level defaults:
+
+```bash
+./ttscli default set --voice en-US-Chirp3-HD-Achernar --lang en-US
+```
+
+Set only one field (partial update):
+
+```bash
+./ttscli default set --voice en-US-Neural2-F
+```
+
+Show current defaults:
+
+```bash
+./ttscli default get
+```
+
+Clear saved defaults:
+
+```bash
+./ttscli default unset
+```
+
 ### Behavior Notes
 
 - Synthesize mode requires `--text` and at least one output mode: `--save` or `--play`.
 - `--list-voices` bypasses synth validation and does not require `--text`.
 - Press `Ctrl+C` to cancel in-flight API work gracefully.
 - On Linux, playback command priority is: `mpg123`, then `paplay`, then `ffplay`.
+- Priority for synth/list language and voice:
+  explicit flags (`--voice`, `--lang`) > saved defaults (`ttscli default ...`) > built-in defaults.
+- `default set` validates against Google TTS before saving.
 
 ## Help
 
@@ -134,12 +163,15 @@ For a full list of flags, use the `--help` command:
   install one of `mpg123`, `paplay`, or `ffplay`.
 - `failed to synthesize: status=... body=...`:
   verify API key validity, API enablement, and key restrictions for Cloud Text-to-Speech API.
+- `voice "..." is not available for language "..."` when running `default set`:
+  use `--list-voices --lang <lang>` to find valid voice names.
 
 ## Project Structure
 
 - `cmd/ttscli`: CLI entrypoint (`main`, `--version` handling).
 - `internal/app`: top-level application flow and dependency wiring.
 - `internal/cli`: flag parsing and argument validation.
+- `internal/config`: user-level persisted defaults (`voice`, `lang`).
 - `internal/tts`: Google TTS client and response parsing.
 - `internal/player`: local audio playback across OS platforms.
 

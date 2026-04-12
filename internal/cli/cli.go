@@ -9,32 +9,46 @@ import (
 
 const (
 	appName           = "ttscli"
-	defaultLanguage   = "en-US"
-	defaultVoice      = "en-US-Neural2-F"
+	DefaultLanguage   = "en-US"
+	DefaultVoice      = "en-US-Neural2-F"
 	helpTitle         = "GCP Text-to-Speech CLI"
 	helpExampleSpeak  = `  ttscli --text "Hello world" --play`
 	helpExampleVoices = "  ttscli --list-voices --lang en-GB"
+	ModeRun           = "run"
+	ModeDefault       = "default"
+	DefaultSet        = "set"
+	DefaultGet        = "get"
+	DefaultUnset      = "unset"
 )
 
 type Config struct {
-	Text       string
-	SavePath   string
-	Play       bool
-	Lang       string
-	Voice      string
-	ListVoices bool
+	Mode              string
+	Text              string
+	SavePath          string
+	Play              bool
+	Lang              string
+	Voice             string
+	ListVoices        bool
+	HasVoiceFlag      bool
+	HasLangFlag       bool
+	DefaultSubcommand string
 }
 
 func ParseArgs(args []string, stderr io.Writer) (Config, error) {
+	if len(args) > 0 && args[0] == ModeDefault {
+		return parseDefaultCommand(args[1:], stderr)
+	}
+
 	cfg := Config{}
+	cfg.Mode = ModeRun
 	fs := flag.NewFlagSet(appName, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
 	fs.StringVar(&cfg.Text, "text", "", "Text to convert to speech")
 	fs.StringVar(&cfg.SavePath, "save", "", "Path to save the output MP3 file (e.g., output.mp3)")
 	fs.BoolVar(&cfg.Play, "play", false, "Play the audio immediately")
-	fs.StringVar(&cfg.Lang, "lang", defaultLanguage, "Language code")
-	fs.StringVar(&cfg.Voice, "voice", defaultVoice, "Voice name")
+	fs.StringVar(&cfg.Lang, "lang", DefaultLanguage, "Language code")
+	fs.StringVar(&cfg.Voice, "voice", DefaultVoice, "Voice name")
 	fs.BoolVar(&cfg.ListVoices, "list-voices", false, "List available voices (filtered by --lang)")
 
 	fs.Usage = func() {
@@ -51,6 +65,14 @@ func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 	if err := fs.Parse(args); err != nil {
 		return cfg, err
 	}
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "voice":
+			cfg.HasVoiceFlag = true
+		case "lang":
+			cfg.HasLangFlag = true
+		}
+	})
 
 	if fs.NArg() > 0 {
 		return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(fs.Args(), " "))
@@ -69,4 +91,45 @@ func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func parseDefaultCommand(args []string, stderr io.Writer) (Config, error) {
+	cfg := Config{Mode: ModeDefault}
+	if len(args) == 0 {
+		return cfg, fmt.Errorf("please provide a default subcommand: set, get, or unset")
+	}
+
+	cfg.DefaultSubcommand = args[0]
+	switch cfg.DefaultSubcommand {
+	case DefaultGet, DefaultUnset:
+		if len(args) > 1 {
+			return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(args[1:], " "))
+		}
+		return cfg, nil
+	case DefaultSet:
+		fs := flag.NewFlagSet(appName+" default set", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		fs.StringVar(&cfg.Voice, "voice", "", "Default voice name")
+		fs.StringVar(&cfg.Lang, "lang", "", "Default language code")
+		if err := fs.Parse(args[1:]); err != nil {
+			return cfg, err
+		}
+		fs.Visit(func(f *flag.Flag) {
+			switch f.Name {
+			case "voice":
+				cfg.HasVoiceFlag = true
+			case "lang":
+				cfg.HasLangFlag = true
+			}
+		})
+		if fs.NArg() > 0 {
+			return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(fs.Args(), " "))
+		}
+		if !cfg.HasVoiceFlag && !cfg.HasLangFlag {
+			return cfg, fmt.Errorf("please provide --voice and/or --lang")
+		}
+		return cfg, nil
+	default:
+		return cfg, fmt.Errorf("unsupported default subcommand %q (use: set, get, unset)", cfg.DefaultSubcommand)
+	}
 }

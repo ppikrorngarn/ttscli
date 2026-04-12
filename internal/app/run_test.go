@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ppikrorngarn/ttscli/internal/cli"
+	"github.com/ppikrorngarn/ttscli/internal/config"
 	"github.com/ppikrorngarn/ttscli/internal/tts"
 )
 
@@ -433,21 +434,244 @@ func TestRunEndToEndFlowWithRealParseArgs(t *testing.T) {
 	}
 }
 
+func TestRunDefaultGet(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
+		return cli.Config{Mode: "default", DefaultSubcommand: "get"}, nil
+	}
+	loadDefaults = func() (config.Defaults, error) {
+		return config.Defaults{Voice: "en-US-Chirp3-HD-Achernar", Lang: "en-US"}, nil
+	}
+
+	var stdout bytes.Buffer
+	err := Run([]string{"default", "get"}, &stdout, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "Default voice: en-US-Chirp3-HD-Achernar") ||
+		!strings.Contains(out, "Default language: en-US") {
+		t.Fatalf("unexpected output: %q", out)
+	}
+}
+
+func TestRunDefaultUnset(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
+		return cli.Config{Mode: "default", DefaultSubcommand: "unset"}, nil
+	}
+	cleared := false
+	clearDefaults = func() error {
+		cleared = true
+		return nil
+	}
+
+	var stdout bytes.Buffer
+	err := Run([]string{"default", "unset"}, &stdout, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if !cleared {
+		t.Fatal("expected clearDefaults to be called")
+	}
+	if !strings.Contains(stdout.String(), "Cleared saved defaults.") {
+		t.Fatalf("unexpected output: %q", stdout.String())
+	}
+}
+
+func TestRunDefaultSetValidatesAndSaves(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
+		return cli.Config{
+			Mode:              "default",
+			DefaultSubcommand: "set",
+			Voice:             "en-US-Chirp3-HD-Achernar",
+			HasVoiceFlag:      true,
+		}, nil
+	}
+	loadDotenv = func(...string) error { return nil }
+	lookupEnv = func(_ string) string { return "k" }
+	loadDefaults = func() (config.Defaults, error) {
+		return config.Defaults{Lang: "en-US"}, nil
+	}
+	newTTSClient = func(apiKey string) ttsService {
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, langCode string) ([]tts.Voice, error) {
+				return []tts.Voice{{Name: "en-US-Chirp3-HD-Achernar"}}, nil
+			},
+			synthesizeFn: func(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
+				t.Fatal("Synthesize should not be called")
+				return nil, nil
+			},
+		}
+	}
+
+	var saved config.Defaults
+	saveDefaults = func(d config.Defaults) error {
+		saved = d
+		return nil
+	}
+
+	var stdout bytes.Buffer
+	err := Run([]string{"default", "set", "--voice", "en-US-Chirp3-HD-Achernar"}, &stdout, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if saved.Voice != "en-US-Chirp3-HD-Achernar" || saved.Lang != "en-US" {
+		t.Fatalf("unexpected saved defaults: %+v", saved)
+	}
+	if !strings.Contains(stdout.String(), "Saved defaults:") {
+		t.Fatalf("unexpected output: %q", stdout.String())
+	}
+}
+
+func TestRunDefaultSetVoiceValidationError(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
+		return cli.Config{
+			Mode:              "default",
+			DefaultSubcommand: "set",
+			Voice:             "voice-not-found",
+			HasVoiceFlag:      true,
+			Lang:              "en-US",
+			HasLangFlag:       true,
+		}, nil
+	}
+	loadDotenv = func(...string) error { return nil }
+	lookupEnv = func(_ string) string { return "k" }
+	newTTSClient = func(apiKey string) ttsService {
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, langCode string) ([]tts.Voice, error) {
+				return []tts.Voice{{Name: "en-US-Neural2-F"}}, nil
+			},
+			synthesizeFn: func(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
+				return nil, nil
+			},
+		}
+	}
+
+	err := Run([]string{"default", "set", "--voice", "voice-not-found", "--lang", "en-US"}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "is not available for language") {
+		t.Fatalf("expected validation error, got: %v", err)
+	}
+}
+
+func TestRunUsesPersistedDefaultsWhenFlagsNotProvided(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
+		return cli.Config{
+			Mode:       "run",
+			Text:       "hello",
+			Play:       true,
+			Lang:       cli.DefaultLanguage,
+			Voice:      cli.DefaultVoice,
+			ListVoices: false,
+		}, nil
+	}
+	loadDotenv = func(...string) error { return nil }
+	lookupEnv = func(_ string) string { return "k" }
+	loadDefaults = func() (config.Defaults, error) {
+		return config.Defaults{Voice: "en-US-Chirp3-HD-Achernar", Lang: "en-US"}, nil
+	}
+
+	var gotVoice, gotLang string
+	newTTSClient = func(apiKey string) ttsService {
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, langCode string) ([]tts.Voice, error) { return nil, nil },
+			synthesizeFn: func(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
+				gotVoice = voiceName
+				gotLang = languageCode
+				return []byte("audio"), nil
+			},
+		}
+	}
+	playAudio = func(audioBytes []byte, stdout, stderr io.Writer) error { return nil }
+
+	if err := Run([]string{"--text", "hello", "--play"}, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if gotVoice != "en-US-Chirp3-HD-Achernar" || gotLang != "en-US" {
+		t.Fatalf("expected persisted defaults to be applied, got voice=%q lang=%q", gotVoice, gotLang)
+	}
+}
+
+func TestRunExplicitFlagsOverridePersistedDefaults(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
+		return cli.Config{
+			Mode:         "run",
+			Text:         "hello",
+			Play:         true,
+			Lang:         "en-GB",
+			Voice:        "en-GB-Neural2-B",
+			HasVoiceFlag: true,
+			HasLangFlag:  true,
+		}, nil
+	}
+	loadDotenv = func(...string) error { return nil }
+	lookupEnv = func(_ string) string { return "k" }
+	loadDefaults = func() (config.Defaults, error) {
+		return config.Defaults{Voice: "en-US-Chirp3-HD-Achernar", Lang: "en-US"}, nil
+	}
+
+	var gotVoice, gotLang string
+	newTTSClient = func(apiKey string) ttsService {
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, langCode string) ([]tts.Voice, error) { return nil, nil },
+			synthesizeFn: func(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
+				gotVoice = voiceName
+				gotLang = languageCode
+				return []byte("audio"), nil
+			},
+		}
+	}
+	playAudio = func(audioBytes []byte, stdout, stderr io.Writer) error { return nil }
+
+	if err := Run([]string{"--text", "hello", "--play", "--voice", "en-GB-Neural2-B", "--lang", "en-GB"}, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if gotVoice != "en-GB-Neural2-B" || gotLang != "en-GB" {
+		t.Fatalf("expected explicit flags to win, got voice=%q lang=%q", gotVoice, gotLang)
+	}
+}
+
 func stubAppDeps() func() {
 	oldParseArgs := parseArgs
 	oldLoadDotenv := loadDotenv
 	oldLookupEnv := lookupEnv
 	oldNewTTSClient := newTTSClient
+	oldLoadDefaults := loadDefaults
+	oldSaveDefaults := saveDefaults
+	oldClearDefaults := clearDefaults
 	oldPrintVoices := printVoices
 	oldWriteFile := writeFile
 	oldPlayAudio := playAudio
 	oldNewAppCtx := newAppCtx
+
+	loadDefaults = func() (config.Defaults, error) { return config.Defaults{}, nil }
+	saveDefaults = func(config.Defaults) error { return nil }
+	clearDefaults = func() error { return nil }
 
 	return func() {
 		parseArgs = oldParseArgs
 		loadDotenv = oldLoadDotenv
 		lookupEnv = oldLookupEnv
 		newTTSClient = oldNewTTSClient
+		loadDefaults = oldLoadDefaults
+		saveDefaults = oldSaveDefaults
+		clearDefaults = oldClearDefaults
 		printVoices = oldPrintVoices
 		writeFile = oldWriteFile
 		playAudio = oldPlayAudio
