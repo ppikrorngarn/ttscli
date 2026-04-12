@@ -57,6 +57,21 @@ export PATH="$(go env GOPATH)/bin:$PATH"
 make check
 ```
 
+For contribution and licensing details, see:
+- [CONTRIBUTING.md](./CONTRIBUTING.md)
+- [LICENSE](./LICENSE)
+
+### Development Checks
+
+Run these during development:
+
+```bash
+make test
+make test-race
+make lint
+make check
+```
+
 ## Usage
 
 If you installed via `go install`, run `ttscli ...` from your shell `PATH`.
@@ -198,7 +213,7 @@ For a full list of flags, use the `--help` command:
 ```bash
 ttscli --help
 ```
-If you run `./ttscli` with no arguments, it will print a hint to run `--help`.
+If you run `ttscli` with no arguments, it will print a hint to run `--help`.
 
 ## Shell Completion
 
