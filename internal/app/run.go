@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/ppikrorngarn/ttscli/internal/cli"
 	"github.com/ppikrorngarn/ttscli/internal/player"
@@ -28,6 +30,9 @@ var (
 	printVoices  = tts.PrintVoices
 	writeFile    = os.WriteFile
 	playAudio    = player.PlayAudio
+	newAppCtx    = func() (context.Context, context.CancelFunc) {
+		return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	}
 )
 
 func Run(args []string, stdout, stderr io.Writer) error {
@@ -45,7 +50,8 @@ func Run(args []string, stdout, stderr io.Writer) error {
 	}
 
 	client := newTTSClient(apiKey)
-	ctx := context.Background()
+	ctx, stop := newAppCtx()
+	defer stop()
 
 	if cfg.ListVoices {
 		voices, err := client.ListVoices(ctx, cfg.Lang)
@@ -77,9 +83,4 @@ func Run(args []string, stdout, stderr io.Writer) error {
 	}
 
 	return nil
-}
-
-func ExitErr(stderr io.Writer, err error) {
-	fmt.Fprintln(stderr, "Error:", err)
-	os.Exit(1)
 }

@@ -283,6 +283,73 @@ func TestRunPlaySuccess(t *testing.T) {
 	}
 }
 
+func TestRunUsesAppContextForSynthesize(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
+		return cli.Config{Text: "hello", Play: true, Lang: "en-US", Voice: "en-US-Neural2-F"}, nil
+	}
+	loadDotenv = func(...string) error { return nil }
+	lookupEnv = func(_ string) string { return "k" }
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	newAppCtx = func() (context.Context, context.CancelFunc) {
+		return ctx, func() {}
+	}
+
+	newTTSClient = func(apiKey string) ttsService {
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, langCode string) ([]tts.Voice, error) { return nil, nil },
+			synthesizeFn: func(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
+				if !errors.Is(ctx.Err(), context.Canceled) {
+					t.Fatalf("expected canceled context, got: %v", ctx.Err())
+				}
+				return nil, context.Canceled
+			},
+		}
+	}
+
+	err := Run([]string{"--text", "hello", "--play"}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "failed to synthesize") {
+		t.Fatalf("expected synthesize error on canceled context, got: %v", err)
+	}
+}
+
+func TestRunCallsContextStop(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
+		return cli.Config{Text: "hello", Play: true, Lang: "en-US", Voice: "en-US-Neural2-F"}, nil
+	}
+	loadDotenv = func(...string) error { return nil }
+	lookupEnv = func(_ string) string { return "k" }
+
+	stopCalled := false
+	newAppCtx = func() (context.Context, context.CancelFunc) {
+		return context.Background(), func() { stopCalled = true }
+	}
+
+	newTTSClient = func(apiKey string) ttsService {
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, langCode string) ([]tts.Voice, error) { return nil, nil },
+			synthesizeFn: func(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
+				return []byte("audio"), nil
+			},
+		}
+	}
+	playAudio = func(audioBytes []byte, stdout, stderr io.Writer) error { return nil }
+
+	if err := Run([]string{"--text", "hello", "--play"}, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if !stopCalled {
+		t.Fatal("expected context stop function to be called")
+	}
+}
+
 func stubAppDeps() func() {
 	oldParseArgs := parseArgs
 	oldLoadDotenv := loadDotenv
@@ -291,6 +358,7 @@ func stubAppDeps() func() {
 	oldPrintVoices := printVoices
 	oldWriteFile := writeFile
 	oldPlayAudio := playAudio
+	oldNewAppCtx := newAppCtx
 
 	return func() {
 		parseArgs = oldParseArgs
@@ -300,5 +368,6 @@ func stubAppDeps() func() {
 		printVoices = oldPrintVoices
 		writeFile = oldWriteFile
 		playAudio = oldPlayAudio
+		newAppCtx = oldNewAppCtx
 	}
 }
