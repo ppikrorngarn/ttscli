@@ -6,14 +6,14 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
 
 ## Prerequisites
 
-1. **Go:** Make sure you have Go installed on your machine.
+1. **Go:** Install Go `1.25+` (matches `go.mod`).
 2. **Google Cloud API Key:** You need an API key for the Google Cloud Text-to-Speech API.
    - Go to Google Cloud Console > APIs & Services > Credentials.
    - Create an API Key and restrict it to the "Cloud Text-to-Speech API".
 3. **Audio Player (Linux Only):** If you are running on Linux and want to use the `--play` flag, you need an audio player installed. The CLI looks for `mpg123`, `paplay`, or `ffplay`.
    - Ubuntu/Debian: `sudo apt install mpg123`
 4. **Staticcheck (for local quality checks):** Optional but recommended for contributors.
-   - Install: `go install honnef.co/go/tools/cmd/staticcheck@latest`
+   - Install: `go install honnef.co/go/tools/cmd/staticcheck@v0.7.0`
 
 ## Setup
 
@@ -21,6 +21,7 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
    ```bash
    go install github.com/ppikrorngarn/ttscli/cmd/ttscli@latest
    ```
+   Make sure `$(go env GOPATH)/bin` is in your `PATH`.
 
 2. **Or clone the repository and build the binary locally:**
    You can use the provided Makefile to build the project easily:
@@ -31,7 +32,7 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
 
 3. **Run first-time setup (recommended):**
    ```bash
-   ./ttscli setup
+   ttscli setup
    ```
    This guided flow prompts for API key, default language, and default voice, validates them, and can run a sound check.
    Press Enter on language/voice prompts to use built-in defaults: `en-US` and `en-US-Neural2-F`.
@@ -39,7 +40,7 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
 4. **Manual API key setup (alternative):**
    Save it once with:
    ```bash
-   ./ttscli default set --api-key "your_api_key_here"
+   ttscli default set --api-key "your_api_key_here"
    ```
    Or export it in your terminal for the current shell/session:
    ```bash
@@ -58,7 +59,16 @@ make check
 
 ## Usage
 
-You can run the CLI by executing the `./ttscli` binary. 
+If you installed via `go install`, run `ttscli ...` from your shell `PATH`.
+If you built locally with `make build`, run `./ttscli ...` from the repo root.
+
+### Command Reference
+
+- `ttscli setup`: Interactive first-run setup (API key + defaults + optional sound check).
+- `ttscli doctor`: Health checks (config, API key, API connectivity, playback). Returns non-zero when checks fail.
+- `ttscli completion <bash|zsh|fish>`: Prints shell completion script to stdout.
+- `ttscli default set|get|unset`: Manage saved defaults (`voice`, `lang`, `apiKey`).
+- `ttscli --version`: Print build metadata.
 
 ### Flags Reference
 
@@ -76,37 +86,37 @@ You can run the CLI by executing the `./ttscli` binary.
 
 **0. Show CLI version/build metadata:**
 ```bash
-./ttscli --version
+ttscli --version
 ```
 
 **1. Run setup wizard (first run):**
 ```bash
-./ttscli setup
+ttscli setup
 ```
 
 **2. Run diagnostics:**
 ```bash
-./ttscli doctor
+ttscli doctor
 ```
 
 **3. Generate shell completions:**
 ```bash
-./ttscli completion zsh
+ttscli completion zsh
 ```
 
 **4. Play audio immediately (without saving):**
 ```bash
-./ttscli --text "Hello world, this is a test." --play
+ttscli --text "Hello world, this is a test." --play
 ```
 
 **5. Save audio to a file:**
 ```bash
-./ttscli --text "Save this to a file." --save output.mp3
+ttscli --text "Save this to a file." --save output.mp3
 ```
 
 **6. Save and play:**
 ```bash
-./ttscli --text "Save and play." --save output.mp3 --play
+ttscli --text "Save and play." --save output.mp3 --play
 ```
 
 ### Voice and Language Selection
@@ -115,12 +125,12 @@ By default, the CLI uses a female US English voice (`en-US-Neural2-F`). You can 
 
 **Example: British Male Voice:**
 ```bash
-./ttscli --text "Hello there, how are you doing today?" --lang "en-GB" --voice "en-GB-Neural2-B" --play
+ttscli --text "Hello there, how are you doing today?" --lang "en-GB" --voice "en-GB-Neural2-B" --play
 ```
 
 **Example: French Voice:**
 ```bash
-./ttscli --text "Bonjour le monde" --lang "fr-FR" --voice "fr-FR-Neural2-A" --play
+ttscli --text "Bonjour le monde" --lang "fr-FR" --voice "fr-FR-Neural2-A" --play
 ```
 
 ### Listing Available Voices
@@ -129,12 +139,12 @@ You can list all available voices for a specific language directly from the API.
 
 **List US English voices (default):**
 ```bash
-./ttscli --list-voices
+ttscli --list-voices
 ```
 
 **List voices for another language:**
 ```bash
-./ttscli --list-voices --lang en-GB
+ttscli --list-voices --lang en-GB
 ```
 
 ### Persistent Defaults (NVM-like)
@@ -142,31 +152,31 @@ You can list all available voices for a specific language directly from the API.
 Set user-level defaults:
 
 ```bash
-./ttscli default set --voice en-US-Chirp3-HD-Achernar --lang en-US
+ttscli default set --voice en-US-Chirp3-HD-Achernar --lang en-US
 ```
 
 Set a saved API key:
 
 ```bash
-./ttscli default set --api-key "your_api_key_here"
+ttscli default set --api-key "your_api_key_here"
 ```
 
 Set only one field (partial update):
 
 ```bash
-./ttscli default set --voice en-US-Neural2-F
+ttscli default set --voice en-US-Neural2-F
 ```
 
 Show current defaults:
 
 ```bash
-./ttscli default get
+ttscli default get
 ```
 
 Clear saved defaults:
 
 ```bash
-./ttscli default unset
+ttscli default unset
 ```
 
 ### Behavior Notes
@@ -186,7 +196,7 @@ Clear saved defaults:
 
 For a full list of flags, use the `--help` command:
 ```bash
-./ttscli --help
+ttscli --help
 ```
 If you run `./ttscli` with no arguments, it will print a hint to run `--help`.
 
@@ -195,28 +205,32 @@ If you run `./ttscli` with no arguments, it will print a hint to run `--help`.
 Generate completion scripts:
 
 ```bash
-./ttscli completion bash
-./ttscli completion zsh
-./ttscli completion fish
+ttscli completion bash
+ttscli completion zsh
+ttscli completion fish
 ```
 
 Install examples:
 
 ```bash
 # bash (Linux)
-./ttscli completion bash > /etc/bash_completion.d/ttscli
+ttscli completion bash > /etc/bash_completion.d/ttscli
+source /etc/bash_completion
 ```
 
 ```bash
 # zsh (macOS/Linux)
 mkdir -p ~/.zsh/completions
-./ttscli completion zsh > ~/.zsh/completions/_ttscli
+ttscli completion zsh > ~/.zsh/completions/_ttscli
+# ensure ~/.zsh/completions is in fpath, then:
+autoload -Uz compinit && compinit
 ```
 
 ```bash
 # fish
 mkdir -p ~/.config/fish/completions
-./ttscli completion fish > ~/.config/fish/completions/ttscli.fish
+ttscli completion fish > ~/.config/fish/completions/ttscli.fish
+# open a new shell (or run: exec fish)
 ```
 
 ## Troubleshooting
@@ -227,6 +241,8 @@ mkdir -p ~/.config/fish/completions
   install one of `mpg123`, `paplay`, or `ffplay`.
 - `failed to synthesize: status=... body=...`:
   verify API key validity, API enablement, and key restrictions for Cloud Text-to-Speech API.
+- `dial tcp: lookup texttospeech.googleapis.com: no such host`:
+  this is a DNS/network issue in your environment; verify internet/DNS and retry.
 - `voice "..." is not available for language "..."` when running `default set`:
   use `--list-voices --lang <lang>` to find valid voice names.
 
@@ -264,7 +280,7 @@ make build VERSION=v0.1.0 COMMIT=$(git rev-parse --short HEAD) DATE=$(date -u +"
 Sample version output:
 
 ```bash
-./ttscli --version
+ttscli --version
 # ttscli version=v0.1.0 commit=abc1234 date=2026-04-12T12:00:00Z
 ```
 
