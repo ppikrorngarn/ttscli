@@ -177,6 +177,7 @@ For a full list of flags, use the `--help` command:
 ```bash
 ./ttscli --help
 ```
+If you run `./ttscli` with no arguments, it will print a hint to run `--help`.
 
 ## Troubleshooting
 

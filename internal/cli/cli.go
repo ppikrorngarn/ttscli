@@ -12,8 +12,14 @@ const (
 	DefaultLanguage   = "en-US"
 	DefaultVoice      = "en-US-Neural2-F"
 	helpTitle         = "GCP Text-to-Speech CLI"
+	helpUsageRun       = `  ttscli --text "Hello world" --play`
+	helpUsageList      = "  ttscli --list-voices --lang en-GB"
+	helpUsageSetup     = "  ttscli setup"
+	helpUsageDefault   = "  ttscli default <set|get|unset> [flags]"
 	helpExampleSpeak  = `  ttscli --text "Hello world" --play`
 	helpExampleVoices = "  ttscli --list-voices --lang en-GB"
+	helpExampleSetup   = "  ttscli setup"
+	helpExampleDefault = "  ttscli default set --voice en-US-Chirp3-HD-Achernar --lang en-US"
 	ModeRun           = "run"
 	ModeDefault       = "default"
 	ModeSetup         = "setup"
@@ -65,9 +71,18 @@ func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 		fmt.Fprintln(stderr, helpTitle)
 		fmt.Fprintln(stderr)
 		fmt.Fprintln(stderr, "Usage:")
+		fmt.Fprintln(stderr, helpUsageSetup)
+		fmt.Fprintln(stderr, helpUsageDefault)
+		fmt.Fprintln(stderr, helpUsageRun)
+		fmt.Fprintln(stderr, helpUsageList)
+		fmt.Fprintln(stderr, "  ttscli --version")
+		fmt.Fprintln(stderr)
+		fmt.Fprintln(stderr, "Run Flags:")
 		fs.PrintDefaults()
 		fmt.Fprintln(stderr)
 		fmt.Fprintln(stderr, "Examples:")
+		fmt.Fprintln(stderr, helpExampleSetup)
+		fmt.Fprintln(stderr, helpExampleDefault)
 		fmt.Fprintln(stderr, helpExampleSpeak)
 		fmt.Fprintln(stderr, helpExampleVoices)
 	}
@@ -90,6 +105,10 @@ func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 
 	if cfg.ListVoices {
 		return cfg, nil
+	}
+
+	if len(args) == 0 {
+		return cfg, fmt.Errorf("no arguments provided; run \"ttscli --help\" for usage")
 	}
 
 	if cfg.Text == "" {

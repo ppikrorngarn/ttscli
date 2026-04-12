@@ -35,6 +35,17 @@ func TestParseCLIArgsMissingText(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsNoArgsHintsHelp(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{}, &stderr)
+	if err == nil {
+		t.Fatal("expected error for no args")
+	}
+	if !strings.Contains(err.Error(), "ttscli --help") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestParseCLIArgsMissingOutputMode(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := ParseArgs([]string{"--text", "hello"}, &stderr)
@@ -82,6 +93,11 @@ func TestParseCLIArgsHelp(t *testing.T) {
 	}
 	if err != flag.ErrHelp {
 		t.Fatalf("expected flag.ErrHelp, got %v", err)
+	}
+	helpText := stderr.String()
+	if !strings.Contains(helpText, "ttscli setup") ||
+		!strings.Contains(helpText, "ttscli default <set|get|unset> [flags]") {
+		t.Fatalf("help text missing setup/default usage, got: %q", helpText)
 	}
 }
 
