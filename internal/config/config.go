@@ -15,8 +15,9 @@ const (
 )
 
 type Defaults struct {
-	Voice string `json:"voice,omitempty"`
-	Lang  string `json:"lang,omitempty"`
+	Voice  string `json:"voice,omitempty"`
+	Lang   string `json:"lang,omitempty"`
+	APIKey string `json:"apiKey,omitempty"`
 }
 
 var (

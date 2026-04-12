@@ -34,7 +34,7 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
    ```env
    TTSCLI_GOOGLE_API_KEY="your_api_key_here"
    ```
-   *(Alternatively, you can export it in your terminal: `export TTSCLI_GOOGLE_API_KEY="your_api_key_here"`)*
+   *(Alternatively, you can save it once with `./ttscli default set --api-key "your_api_key_here"` or export it in your terminal: `export TTSCLI_GOOGLE_API_KEY="your_api_key_here"`.)*
 
 ### Contributor Setup
 
@@ -120,6 +120,12 @@ Set user-level defaults:
 ./ttscli default set --voice en-US-Chirp3-HD-Achernar --lang en-US
 ```
 
+Set a saved API key:
+
+```bash
+./ttscli default set --api-key "your_api_key_here"
+```
+
 Set only one field (partial update):
 
 ```bash
@@ -146,6 +152,8 @@ Clear saved defaults:
 - On Linux, playback command priority is: `mpg123`, then `paplay`, then `ffplay`.
 - Priority for synth/list language and voice:
   explicit flags (`--voice`, `--lang`) > saved defaults (`ttscli default ...`) > built-in defaults.
+- Priority for API key:
+  `TTSCLI_GOOGLE_API_KEY` (env) > saved API key (`ttscli default set --api-key ...`).
 - `default set` validates against Google TTS before saving.
 
 ## Help
@@ -158,7 +166,7 @@ For a full list of flags, use the `--help` command:
 ## Troubleshooting
 
 - `TTSCLI_GOOGLE_API_KEY environment variable is not set`:
-  set `TTSCLI_GOOGLE_API_KEY` in your shell or `.env` file.
+  set `TTSCLI_GOOGLE_API_KEY` in your shell/`.env` file, or save it with `ttscli default set --api-key ...`.
 - `no supported audio player found on Linux`:
   install one of `mpg123`, `paplay`, or `ffplay`.
 - `failed to synthesize: status=... body=...`:

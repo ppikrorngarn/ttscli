@@ -28,9 +28,11 @@ type Config struct {
 	Play              bool
 	Lang              string
 	Voice             string
+	APIKey            string
 	ListVoices        bool
 	HasVoiceFlag      bool
 	HasLangFlag       bool
+	HasAPIKeyFlag     bool
 	DefaultSubcommand string
 }
 
@@ -101,7 +103,7 @@ func parseDefaultCommand(args []string, stderr io.Writer) (Config, error) {
 
 	cfg.DefaultSubcommand = args[0]
 	switch cfg.DefaultSubcommand {
-	case DefaultGet, DefaultUnset:
+	case DefaultGet:
 		if len(args) > 1 {
 			return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(args[1:], " "))
 		}
@@ -111,6 +113,7 @@ func parseDefaultCommand(args []string, stderr io.Writer) (Config, error) {
 		fs.SetOutput(stderr)
 		fs.StringVar(&cfg.Voice, "voice", "", "Default voice name")
 		fs.StringVar(&cfg.Lang, "lang", "", "Default language code")
+		fs.StringVar(&cfg.APIKey, "api-key", "", "Default Google Cloud Text-to-Speech API key")
 		if err := fs.Parse(args[1:]); err != nil {
 			return cfg, err
 		}
@@ -120,13 +123,28 @@ func parseDefaultCommand(args []string, stderr io.Writer) (Config, error) {
 				cfg.HasVoiceFlag = true
 			case "lang":
 				cfg.HasLangFlag = true
+			case "api-key":
+				cfg.HasAPIKeyFlag = true
 			}
 		})
 		if fs.NArg() > 0 {
 			return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(fs.Args(), " "))
 		}
-		if !cfg.HasVoiceFlag && !cfg.HasLangFlag {
-			return cfg, fmt.Errorf("please provide --voice and/or --lang")
+		if !cfg.HasVoiceFlag && !cfg.HasLangFlag && !cfg.HasAPIKeyFlag {
+			return cfg, fmt.Errorf("please provide --voice, --lang, and/or --api-key")
+		}
+		return cfg, nil
+	case DefaultUnset:
+		fs := flag.NewFlagSet(appName+" default unset", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		fs.BoolVar(&cfg.HasVoiceFlag, "voice", false, "Unset saved default voice")
+		fs.BoolVar(&cfg.HasLangFlag, "lang", false, "Unset saved default language")
+		fs.BoolVar(&cfg.HasAPIKeyFlag, "api-key", false, "Unset saved API key")
+		if err := fs.Parse(args[1:]); err != nil {
+			return cfg, err
+		}
+		if fs.NArg() > 0 {
+			return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(fs.Args(), " "))
 		}
 		return cfg, nil
 	default:

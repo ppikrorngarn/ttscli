@@ -38,7 +38,7 @@ func TestLoadDefaultsNotExists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadDefaults returned error: %v", err)
 	}
-	if defaults.Voice != "" || defaults.Lang != "" {
+	if defaults.Voice != "" || defaults.Lang != "" || defaults.APIKey != "" {
 		t.Fatalf("expected empty defaults, got %+v", defaults)
 	}
 }
@@ -70,13 +70,15 @@ func TestSaveDefaultsWritesFile(t *testing.T) {
 	wrote := false
 	writeFile = func(name string, data []byte, perm os.FileMode) error {
 		wrote = true
-		if !strings.Contains(string(data), `"voice": "v1"`) || !strings.Contains(string(data), `"lang": "en-GB"`) {
+		if !strings.Contains(string(data), `"voice": "v1"`) ||
+			!strings.Contains(string(data), `"lang": "en-GB"`) ||
+			!strings.Contains(string(data), `"apiKey": "k-123"`) {
 			t.Fatalf("unexpected config payload: %q", string(data))
 		}
 		return nil
 	}
 
-	err := SaveDefaults(Defaults{Voice: "v1", Lang: "en-GB"})
+	err := SaveDefaults(Defaults{Voice: "v1", Lang: "en-GB", APIKey: "k-123"})
 	if err != nil {
 		t.Fatalf("SaveDefaults returned error: %v", err)
 	}
@@ -134,7 +136,7 @@ func stubConfigDeps() func() {
 		return "/tmp/usercfg", nil
 	}
 	readFile = func(string) ([]byte, error) {
-		return []byte(`{"voice":"en-US-Neural2-F","lang":"en-US"}`), nil
+		return []byte(`{"voice":"en-US-Neural2-F","lang":"en-US","apiKey":"k-old"}`), nil
 	}
 	writeFile = func(string, []byte, os.FileMode) error { return nil }
 	mkdirAll = func(string, os.FileMode) error { return nil }

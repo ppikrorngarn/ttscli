@@ -442,7 +442,7 @@ func TestRunDefaultGet(t *testing.T) {
 		return cli.Config{Mode: "default", DefaultSubcommand: "get"}, nil
 	}
 	loadDefaults = func() (config.Defaults, error) {
-		return config.Defaults{Voice: "en-US-Chirp3-HD-Achernar", Lang: "en-US"}, nil
+		return config.Defaults{Voice: "en-US-Chirp3-HD-Achernar", Lang: "en-US", APIKey: "abcd1234"}, nil
 	}
 
 	var stdout bytes.Buffer
@@ -452,7 +452,8 @@ func TestRunDefaultGet(t *testing.T) {
 	}
 	out := stdout.String()
 	if !strings.Contains(out, "Default voice: en-US-Chirp3-HD-Achernar") ||
-		!strings.Contains(out, "Default language: en-US") {
+		!strings.Contains(out, "Default language: en-US") ||
+		!strings.Contains(out, "Default API key: ****1234") {
 		t.Fatalf("unexpected output: %q", out)
 	}
 }
@@ -531,6 +532,55 @@ func TestRunDefaultSetValidatesAndSaves(t *testing.T) {
 	}
 }
 
+func TestRunDefaultSetAPIKeyValidatesProvidedKey(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
+		return cli.Config{
+			Mode:              cli.ModeDefault,
+			DefaultSubcommand: cli.DefaultSet,
+			APIKey:            "new-key",
+			HasAPIKeyFlag:     true,
+		}, nil
+	}
+	loadDotenv = func(...string) error { return nil }
+	lookupEnv = func(_ string) string { return "env-key" }
+	loadDefaults = func() (config.Defaults, error) {
+		return config.Defaults{Lang: "en-US", Voice: "en-US-Neural2-F", APIKey: "old-key"}, nil
+	}
+
+	var usedAPIKey string
+	newTTSClient = func(apiKey string) ttsService {
+		usedAPIKey = apiKey
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, langCode string) ([]tts.Voice, error) {
+				return []tts.Voice{{Name: "en-US-Neural2-F"}}, nil
+			},
+			synthesizeFn: func(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
+				return nil, nil
+			},
+		}
+	}
+
+	var saved config.Defaults
+	saveDefaults = func(d config.Defaults) error {
+		saved = d
+		return nil
+	}
+
+	err := Run([]string{"default", "set", "--api-key", "new-key"}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if usedAPIKey != "new-key" {
+		t.Fatalf("expected new api key to be validated, got %q", usedAPIKey)
+	}
+	if saved.APIKey != "new-key" {
+		t.Fatalf("expected saved api key to be new-key, got %+v", saved)
+	}
+}
+
 func TestRunDefaultSetVoiceValidationError(t *testing.T) {
 	reset := stubAppDeps()
 	defer reset()
@@ -561,6 +611,126 @@ func TestRunDefaultSetVoiceValidationError(t *testing.T) {
 	err := Run([]string{"default", "set", "--voice", "voice-not-found", "--lang", "en-US"}, &bytes.Buffer{}, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "is not available for language") {
 		t.Fatalf("expected validation error, got: %v", err)
+	}
+}
+
+func TestRunDefaultUnsetSelectedFieldsOnly(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
+		return cli.Config{
+			Mode:              cli.ModeDefault,
+			DefaultSubcommand: cli.DefaultUnset,
+			HasAPIKeyFlag:     true,
+		}, nil
+	}
+	loadDefaults = func() (config.Defaults, error) {
+		return config.Defaults{
+			Voice:  "en-US-Chirp3-HD-Achernar",
+			Lang:   "en-US",
+			APIKey: "old-key",
+		}, nil
+	}
+
+	var saved config.Defaults
+	saveDefaults = func(d config.Defaults) error {
+		saved = d
+		return nil
+	}
+
+	var stdout bytes.Buffer
+	err := Run([]string{"default", "unset", "--api-key"}, &stdout, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if saved.APIKey != "" || saved.Voice == "" || saved.Lang == "" {
+		t.Fatalf("expected only api key to be cleared, got %+v", saved)
+	}
+	if !strings.Contains(stdout.String(), "Updated saved defaults.") {
+		t.Fatalf("unexpected output: %q", stdout.String())
+	}
+}
+
+func TestRunUsesSavedAPIKeyWhenEnvMissing(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
+		return cli.Config{
+			Mode:       cli.ModeRun,
+			Text:       "hello",
+			Play:       true,
+			Lang:       cli.DefaultLanguage,
+			Voice:      cli.DefaultVoice,
+			ListVoices: false,
+		}, nil
+	}
+	loadDotenv = func(...string) error { return nil }
+	lookupEnv = func(_ string) string { return "" }
+	loadDefaults = func() (config.Defaults, error) {
+		return config.Defaults{APIKey: "saved-key"}, nil
+	}
+
+	var usedAPIKey string
+	newTTSClient = func(apiKey string) ttsService {
+		usedAPIKey = apiKey
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, langCode string) ([]tts.Voice, error) { return nil, nil },
+			synthesizeFn: func(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
+				return []byte("audio"), nil
+			},
+		}
+	}
+	playAudio = func(audioBytes []byte, stdout, stderr io.Writer) error { return nil }
+
+	err := Run([]string{"--text", "hello", "--play"}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if usedAPIKey != "saved-key" {
+		t.Fatalf("expected saved api key to be used, got %q", usedAPIKey)
+	}
+}
+
+func TestRunEnvAPIKeyOverridesSavedKey(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
+		return cli.Config{
+			Mode:       cli.ModeRun,
+			Text:       "hello",
+			Play:       true,
+			Lang:       cli.DefaultLanguage,
+			Voice:      cli.DefaultVoice,
+			ListVoices: false,
+		}, nil
+	}
+	loadDotenv = func(...string) error { return nil }
+	lookupEnv = func(_ string) string { return "env-key" }
+	loadDefaults = func() (config.Defaults, error) {
+		return config.Defaults{APIKey: "saved-key"}, nil
+	}
+
+	var usedAPIKey string
+	newTTSClient = func(apiKey string) ttsService {
+		usedAPIKey = apiKey
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, langCode string) ([]tts.Voice, error) { return nil, nil },
+			synthesizeFn: func(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
+				return []byte("audio"), nil
+			},
+		}
+	}
+	playAudio = func(audioBytes []byte, stdout, stderr io.Writer) error { return nil }
+
+	err := Run([]string{"--text", "hello", "--play"}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if usedAPIKey != "env-key" {
+		t.Fatalf("expected env api key to override saved key, got %q", usedAPIKey)
 	}
 }
 

@@ -61,18 +61,19 @@ func Run(args []string, stdout, stderr io.Writer) error {
 		return fmt.Errorf("unsupported mode: %s", cfg.Mode)
 	}
 
-	apiKey := lookupEnv(apiKeyEnvVar)
-	if apiKey == "" {
-		return fmt.Errorf("%s environment variable is not set", apiKeyEnvVar)
+	defaults, err := loadDefaults()
+	if err != nil {
+		return fmt.Errorf("load defaults: %w", err)
 	}
+	apiKey := resolveAPIKey(defaults.APIKey)
+	if apiKey == "" {
+		return fmt.Errorf("%s environment variable is not set and no saved API key found", apiKeyEnvVar)
+	}
+
 	client := newTTSClient(apiKey)
+	cfg = resolveRunDefaults(cfg, defaults)
 	ctx, stop := newAppCtx()
 	defer stop()
-
-	cfg, err = resolveRunDefaults(cfg)
-	if err != nil {
-		return err
-	}
 
 	if cfg.ListVoices {
 		voices, err := client.ListVoices(ctx, cfg.Lang)
@@ -113,6 +114,7 @@ func runDefaultCommand(cfg cli.Config, stdout io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("load defaults: %w", err)
 		}
+
 		voice := defaults.Voice
 		lang := defaults.Lang
 		if strings.TrimSpace(voice) == "" {
@@ -123,18 +125,53 @@ func runDefaultCommand(cfg cli.Config, stdout io.Writer) error {
 		}
 		fmt.Fprintf(stdout, "Default voice: %s\n", voice)
 		fmt.Fprintf(stdout, "Default language: %s\n", lang)
+		fmt.Fprintf(stdout, "Default API key: %s\n", maskAPIKey(defaults.APIKey))
 		return nil
 	case cli.DefaultUnset:
-		if err := clearDefaults(); err != nil {
-			return fmt.Errorf("clear defaults: %w", err)
-		}
-		fmt.Fprintln(stdout, "Cleared saved defaults.")
-		return nil
+		return runDefaultUnset(cfg, stdout)
 	case cli.DefaultSet:
 		return runDefaultSet(cfg, stdout)
 	default:
 		return fmt.Errorf("unsupported default subcommand: %s", cfg.DefaultSubcommand)
 	}
+}
+
+func runDefaultUnset(cfg cli.Config, stdout io.Writer) error {
+	if !cfg.HasVoiceFlag && !cfg.HasLangFlag && !cfg.HasAPIKeyFlag {
+		if err := clearDefaults(); err != nil {
+			return fmt.Errorf("clear defaults: %w", err)
+		}
+		fmt.Fprintln(stdout, "Cleared saved defaults.")
+		return nil
+	}
+
+	defaults, err := loadDefaults()
+	if err != nil {
+		return fmt.Errorf("load defaults: %w", err)
+	}
+
+	if cfg.HasVoiceFlag {
+		defaults.Voice = ""
+	}
+	if cfg.HasLangFlag {
+		defaults.Lang = ""
+	}
+	if cfg.HasAPIKeyFlag {
+		defaults.APIKey = ""
+	}
+
+	if defaultsEmpty(defaults) {
+		if err := clearDefaults(); err != nil {
+			return fmt.Errorf("clear defaults: %w", err)
+		}
+	} else {
+		if err := saveDefaults(defaults); err != nil {
+			return fmt.Errorf("save defaults: %w", err)
+		}
+	}
+
+	fmt.Fprintln(stdout, "Updated saved defaults.")
+	return nil
 }
 
 func runDefaultSet(cfg cli.Config, stdout io.Writer) error {
@@ -150,6 +187,9 @@ func runDefaultSet(cfg cli.Config, stdout io.Writer) error {
 	if cfg.HasLangFlag {
 		merged.Lang = cfg.Lang
 	}
+	if cfg.HasAPIKeyFlag {
+		merged.APIKey = cfg.APIKey
+	}
 	if strings.TrimSpace(merged.Lang) == "" {
 		merged.Lang = cli.DefaultLanguage
 	}
@@ -157,14 +197,18 @@ func runDefaultSet(cfg cli.Config, stdout io.Writer) error {
 		merged.Voice = cli.DefaultVoice
 	}
 
-	apiKey := lookupEnv(apiKeyEnvVar)
-	if apiKey == "" {
-		return fmt.Errorf("%s environment variable is not set", apiKeyEnvVar)
+	validationKey := resolveAPIKey(merged.APIKey)
+	if cfg.HasAPIKeyFlag {
+		validationKey = strings.TrimSpace(merged.APIKey)
 	}
+	if validationKey == "" {
+		return fmt.Errorf("%s environment variable is not set and no saved API key found", apiKeyEnvVar)
+	}
+
 	ctx, stop := newAppCtx()
 	defer stop()
 
-	client := newTTSClient(apiKey)
+	client := newTTSClient(validationKey)
 	voices, err := client.ListVoices(ctx, merged.Lang)
 	if err != nil {
 		return fmt.Errorf("validate defaults via list voices: %w", err)
@@ -176,23 +220,42 @@ func runDefaultSet(cfg cli.Config, stdout io.Writer) error {
 	if err := saveDefaults(merged); err != nil {
 		return fmt.Errorf("save defaults: %w", err)
 	}
-	fmt.Fprintf(stdout, "Saved defaults: voice=%s lang=%s\n", merged.Voice, merged.Lang)
+	fmt.Fprintf(stdout, "Saved defaults: voice=%s lang=%s apiKey=%s\n", merged.Voice, merged.Lang, maskAPIKey(merged.APIKey))
 	return nil
 }
 
-func resolveRunDefaults(cfg cli.Config) (cli.Config, error) {
-	defaults, err := loadDefaults()
-	if err != nil {
-		return cfg, fmt.Errorf("load defaults: %w", err)
-	}
-
+func resolveRunDefaults(cfg cli.Config, defaults config.Defaults) cli.Config {
 	if !cfg.HasVoiceFlag && strings.TrimSpace(defaults.Voice) != "" {
 		cfg.Voice = defaults.Voice
 	}
 	if !cfg.HasLangFlag && strings.TrimSpace(defaults.Lang) != "" {
 		cfg.Lang = defaults.Lang
 	}
-	return cfg, nil
+	return cfg
+}
+
+func resolveAPIKey(savedAPIKey string) string {
+	if envKey := strings.TrimSpace(lookupEnv(apiKeyEnvVar)); envKey != "" {
+		return envKey
+	}
+	return strings.TrimSpace(savedAPIKey)
+}
+
+func defaultsEmpty(d config.Defaults) bool {
+	return strings.TrimSpace(d.Voice) == "" &&
+		strings.TrimSpace(d.Lang) == "" &&
+		strings.TrimSpace(d.APIKey) == ""
+}
+
+func maskAPIKey(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "(not set)"
+	}
+	if len(trimmed) <= 4 {
+		return "****"
+	}
+	return "****" + trimmed[len(trimmed)-4:]
 }
 
 func voiceExists(voiceName string, voices []tts.Voice) bool {

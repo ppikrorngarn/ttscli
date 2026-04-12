@@ -110,13 +110,24 @@ func TestParseCLIArgsDefaultSetVoiceOnly(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsDefaultSetAPIKeyOnly(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"default", "set", "--api-key", "k-12345"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if !cfg.HasAPIKeyFlag || cfg.APIKey != "k-12345" {
+		t.Fatalf("expected api key flag/value to be parsed, got %+v", cfg)
+	}
+}
+
 func TestParseCLIArgsDefaultSetRequiresAtLeastOneFlag(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := ParseArgs([]string{"default", "set"}, &stderr)
 	if err == nil {
 		t.Fatal("expected error when no default set flags are provided")
 	}
-	if !strings.Contains(err.Error(), "please provide --voice and/or --lang") {
+	if !strings.Contains(err.Error(), "please provide --voice, --lang, and/or --api-key") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -149,5 +160,16 @@ func TestParseCLIArgsDefaultUnknownSubcommand(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unsupported default subcommand") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseCLIArgsDefaultUnsetSelectors(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"default", "unset", "--voice", "--api-key"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if !cfg.HasVoiceFlag || !cfg.HasAPIKeyFlag || cfg.HasLangFlag {
+		t.Fatalf("unexpected unset selectors: %+v", cfg)
 	}
 }
