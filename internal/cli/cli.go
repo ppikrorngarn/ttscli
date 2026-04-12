@@ -16,6 +16,7 @@ const (
 	helpExampleVoices = "  ttscli --list-voices --lang en-GB"
 	ModeRun           = "run"
 	ModeDefault       = "default"
+	ModeSetup         = "setup"
 	DefaultSet        = "set"
 	DefaultGet        = "get"
 	DefaultUnset      = "unset"
@@ -39,6 +40,13 @@ type Config struct {
 func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 	if len(args) > 0 && args[0] == ModeDefault {
 		return parseDefaultCommand(args[1:], stderr)
+	}
+	if len(args) > 0 && args[0] == ModeSetup {
+		cfg := Config{Mode: ModeSetup}
+		if len(args) > 1 {
+			return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(args[1:], " "))
+		}
+		return cfg, nil
 	}
 
 	cfg := Config{}

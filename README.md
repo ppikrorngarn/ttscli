@@ -29,7 +29,14 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
    ```
    *(Or run `go build -o ttscli ./cmd/ttscli` directly).*
 
-3. **Configure your API Key:**
+3. **Run first-time setup (recommended):**
+   ```bash
+   ./ttscli setup
+   ```
+   This guided flow prompts for API key, default language, and default voice, validates them, and can run a sound check.
+   Press Enter on language/voice prompts to use built-in defaults: `en-US` and `en-US-Neural2-F`.
+
+4. **Manual API key setup (alternative):**
    Save it once with:
    ```bash
    ./ttscli default set --api-key "your_api_key_here"
@@ -72,17 +79,22 @@ You can run the CLI by executing the `./ttscli` binary.
 ./ttscli --version
 ```
 
-**1. Play audio immediately (without saving):**
+**1. Run setup wizard (first run):**
+```bash
+./ttscli setup
+```
+
+**2. Play audio immediately (without saving):**
 ```bash
 ./ttscli --text "Hello world, this is a test." --play
 ```
 
-**2. Save audio to a file:**
+**3. Save audio to a file:**
 ```bash
 ./ttscli --text "Save this to a file." --save output.mp3
 ```
 
-**3. Save and play:**
+**4. Save and play:**
 ```bash
 ./ttscli --text "Save and play." --save output.mp3 --play
 ```

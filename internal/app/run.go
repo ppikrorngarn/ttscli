@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 )
 
 const apiKeyEnvVar = "TTSCLI_GOOGLE_API_KEY"
+const setupSoundCheckText = "Setup complete. This is a sound check from ttscli."
 
 type ttsService interface {
 	ListVoices(ctx context.Context, langCode string) ([]tts.Voice, error)
@@ -32,6 +34,7 @@ var (
 	printVoices   = tts.PrintVoices
 	writeFile     = os.WriteFile
 	playAudio     = player.PlayAudio
+	setupInput    io.Reader = os.Stdin
 	newAppCtx     = func() (context.Context, context.CancelFunc) {
 		return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	}
@@ -46,6 +49,8 @@ func Run(args []string, stdout, stderr io.Writer) error {
 	switch cfg.Mode {
 	case cli.ModeDefault:
 		return runDefaultCommand(cfg, stdout)
+	case cli.ModeSetup:
+		return runSetupCommand(stdout, stderr)
 	case "":
 		// For backward compatibility in tests that may stub ParseArgs manually.
 		cfg.Mode = cli.ModeRun
@@ -128,6 +133,106 @@ func runDefaultCommand(cfg cli.Config, stdout io.Writer) error {
 	default:
 		return fmt.Errorf("unsupported default subcommand: %s", cfg.DefaultSubcommand)
 	}
+}
+
+func runSetupCommand(stdout, stderr io.Writer) error {
+	defaults, err := loadDefaults()
+	if err != nil {
+		return fmt.Errorf("load defaults: %w", err)
+	}
+
+	reader := bufio.NewReader(setupInput)
+	envAPIKey := strings.TrimSpace(lookupEnv(apiKeyEnvVar))
+	currentAPIKey := strings.TrimSpace(defaults.APIKey)
+
+	fmt.Fprintln(stdout, "Welcome to ttscli setup.")
+	fmt.Fprintf(stdout, "Press Enter on language/voice to use built-in defaults: %s / %s.\n", cli.DefaultLanguage, cli.DefaultVoice)
+	if envAPIKey != "" {
+		fmt.Fprintf(stdout, "Detected %s in environment; press Enter for API key to use it.\n", apiKeyEnvVar)
+	}
+
+	apiKeyPrompt := "Google Cloud API key: "
+	if currentAPIKey != "" {
+		apiKeyPrompt = "Google Cloud API key (press Enter to keep saved key): "
+	}
+	inputAPIKey, err := promptLine(reader, stdout, apiKeyPrompt)
+	if err != nil {
+		return fmt.Errorf("read api key: %w", err)
+	}
+	apiKey := strings.TrimSpace(inputAPIKey)
+	if apiKey == "" {
+		if currentAPIKey != "" {
+			apiKey = currentAPIKey
+		} else if envAPIKey != "" {
+			apiKey = envAPIKey
+		}
+	}
+	if apiKey == "" {
+		return fmt.Errorf("api key is required: set one in setup or via %s", apiKeyEnvVar)
+	}
+
+	inputLang, err := promptLine(reader, stdout, fmt.Sprintf("Default language [%s] (press Enter to use default): ", cli.DefaultLanguage))
+	if err != nil {
+		return fmt.Errorf("read language: %w", err)
+	}
+	lang := strings.TrimSpace(inputLang)
+	if lang == "" {
+		lang = cli.DefaultLanguage
+	}
+
+	inputVoice, err := promptLine(reader, stdout, fmt.Sprintf("Default voice [%s] (press Enter to use default): ", cli.DefaultVoice))
+	if err != nil {
+		return fmt.Errorf("read voice: %w", err)
+	}
+	voice := strings.TrimSpace(inputVoice)
+	if voice == "" {
+		voice = cli.DefaultVoice
+	}
+
+	ctx, stop := newAppCtx()
+	defer stop()
+
+	client := newTTSClient(apiKey)
+	voices, err := client.ListVoices(ctx, lang)
+	if err != nil {
+		return fmt.Errorf("validate defaults via list voices: %w", err)
+	}
+	if !voiceExists(voice, voices) {
+		return fmt.Errorf("voice %q is not available for language %q", voice, lang)
+	}
+
+	merged := defaults
+	merged.APIKey = apiKey
+	merged.Lang = lang
+	merged.Voice = voice
+	if err := saveDefaults(merged); err != nil {
+		return fmt.Errorf("save defaults: %w", err)
+	}
+
+	runCheck, err := promptYesNo(reader, stdout, "Run sound check now? [Y/n]: ", true)
+	if err != nil {
+		return fmt.Errorf("read sound check choice: %w", err)
+	}
+	if runCheck {
+		fmt.Fprintln(stdout, "Running sound check...")
+		audioBytes, err := client.Synthesize(ctx, setupSoundCheckText, lang, voice, tts.AudioEncodingMP3)
+		if err != nil {
+			return fmt.Errorf("failed to synthesize sound check: %w", err)
+		}
+		fmt.Fprintln(stdout, "Playing audio...")
+		if err := playAudio(audioBytes, stdout, stderr); err != nil {
+			return fmt.Errorf("failed to play sound check: %w", err)
+		}
+	}
+
+	cfgPath, err := config.Path()
+	if err != nil {
+		return fmt.Errorf("resolve config path: %w", err)
+	}
+	fmt.Fprintln(stdout, "Setup complete.")
+	fmt.Fprintf(stdout, "Saved defaults: voice=%s lang=%s apiKey=%s\n", merged.Voice, merged.Lang, maskAPIKey(merged.APIKey))
+	fmt.Fprintf(stdout, "Config file: %s\n", cfgPath)
+	return nil
 }
 
 func runDefaultUnset(cfg cli.Config, stdout io.Writer) error {
@@ -259,4 +364,33 @@ func voiceExists(voiceName string, voices []tts.Voice) bool {
 		}
 	}
 	return false
+}
+
+func promptLine(reader *bufio.Reader, stdout io.Writer, prompt string) (string, error) {
+	fmt.Fprint(stdout, prompt)
+	raw, err := reader.ReadString('\n')
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+	return strings.TrimSpace(raw), nil
+}
+
+func promptYesNo(reader *bufio.Reader, stdout io.Writer, prompt string, defaultYes bool) (bool, error) {
+	for {
+		input, err := promptLine(reader, stdout, prompt)
+		if err != nil {
+			return false, err
+		}
+		if input == "" {
+			return defaultYes, nil
+		}
+		switch strings.ToLower(input) {
+		case "y", "yes":
+			return true, nil
+		case "n", "no":
+			return false, nil
+		default:
+			fmt.Fprintln(stdout, "Please answer y or n.")
+		}
+	}
 }

@@ -173,3 +173,25 @@ func TestParseCLIArgsDefaultUnsetSelectors(t *testing.T) {
 		t.Fatalf("unexpected unset selectors: %+v", cfg)
 	}
 }
+
+func TestParseCLIArgsSetup(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"setup"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Mode != ModeSetup {
+		t.Fatalf("expected mode %q, got %+v", ModeSetup, cfg)
+	}
+}
+
+func TestParseCLIArgsSetupRejectsPositionalArgs(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"setup", "extra"}, &stderr)
+	if err == nil {
+		t.Fatal("expected unexpected positional arguments error")
+	}
+	if !strings.Contains(err.Error(), "unexpected positional arguments") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
