@@ -97,8 +97,9 @@ func TestParseCLIArgsHelp(t *testing.T) {
 	helpText := stderr.String()
 	if !strings.Contains(helpText, "ttscli setup") ||
 		!strings.Contains(helpText, "ttscli doctor") ||
+		!strings.Contains(helpText, "ttscli completion <bash|zsh|fish>") ||
 		!strings.Contains(helpText, "ttscli default <set|get|unset> [flags]") {
-		t.Fatalf("help text missing setup/doctor/default usage, got: %q", helpText)
+		t.Fatalf("help text missing setup/doctor/completion/default usage, got: %q", helpText)
 	}
 }
 
@@ -227,6 +228,50 @@ func TestParseCLIArgsDoctor(t *testing.T) {
 func TestParseCLIArgsDoctorRejectsPositionalArgs(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := ParseArgs([]string{"doctor", "extra"}, &stderr)
+	if err == nil {
+		t.Fatal("expected unexpected positional arguments error")
+	}
+	if !strings.Contains(err.Error(), "unexpected positional arguments") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseCLIArgsCompletion(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"completion", "zsh"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Mode != ModeCompletion || cfg.CompletionShell != "zsh" {
+		t.Fatalf("unexpected completion config: %+v", cfg)
+	}
+}
+
+func TestParseCLIArgsCompletionRequiresShell(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"completion"}, &stderr)
+	if err == nil {
+		t.Fatal("expected missing shell error")
+	}
+	if !strings.Contains(err.Error(), "please provide a shell") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseCLIArgsCompletionUnsupportedShell(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"completion", "powershell"}, &stderr)
+	if err == nil {
+		t.Fatal("expected unsupported shell error")
+	}
+	if !strings.Contains(err.Error(), "unsupported shell") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseCLIArgsCompletionRejectsExtraArgs(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"completion", "zsh", "extra"}, &stderr)
 	if err == nil {
 		t.Fatal("expected unexpected positional arguments error")
 	}

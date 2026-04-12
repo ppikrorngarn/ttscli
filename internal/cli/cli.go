@@ -8,28 +8,37 @@ import (
 )
 
 const (
-	appName            = "ttscli"
-	DefaultLanguage    = "en-US"
-	DefaultVoice       = "en-US-Neural2-F"
-	helpTitle          = "GCP Text-to-Speech CLI"
-	helpUsageRun       = `  ttscli --text "Hello world" --play`
-	helpUsageList      = "  ttscli --list-voices --lang en-GB"
-	helpUsageSetup     = "  ttscli setup"
-	helpUsageDoctor    = "  ttscli doctor"
-	helpUsageDefault   = "  ttscli default <set|get|unset> [flags]"
-	helpExampleSpeak   = `  ttscli --text "Hello world" --play`
-	helpExampleVoices  = "  ttscli --list-voices --lang en-GB"
-	helpExampleSetup   = "  ttscli setup"
-	helpExampleDoctor  = "  ttscli doctor"
-	helpExampleDefault = "  ttscli default set --voice en-US-Chirp3-HD-Achernar --lang en-US"
-	ModeRun            = "run"
-	ModeDefault        = "default"
-	ModeSetup          = "setup"
-	ModeDoctor         = "doctor"
-	DefaultSet         = "set"
-	DefaultGet         = "get"
-	DefaultUnset       = "unset"
+	appName               = "ttscli"
+	DefaultLanguage       = "en-US"
+	DefaultVoice          = "en-US-Neural2-F"
+	helpTitle             = "GCP Text-to-Speech CLI"
+	helpUsageRun          = `  ttscli --text "Hello world" --play`
+	helpUsageList         = "  ttscli --list-voices --lang en-GB"
+	helpUsageSetup        = "  ttscli setup"
+	helpUsageDoctor       = "  ttscli doctor"
+	helpUsageCompletion   = "  ttscli completion <bash|zsh|fish>"
+	helpUsageDefault      = "  ttscli default <set|get|unset> [flags]"
+	helpExampleSpeak      = `  ttscli --text "Hello world" --play`
+	helpExampleVoices     = "  ttscli --list-voices --lang en-GB"
+	helpExampleSetup      = "  ttscli setup"
+	helpExampleDoctor     = "  ttscli doctor"
+	helpExampleCompletion = "  ttscli completion zsh"
+	helpExampleDefault    = "  ttscli default set --voice en-US-Chirp3-HD-Achernar --lang en-US"
+	ModeRun               = "run"
+	ModeDefault           = "default"
+	ModeSetup             = "setup"
+	ModeDoctor            = "doctor"
+	ModeCompletion        = "completion"
+	DefaultSet            = "set"
+	DefaultGet            = "get"
+	DefaultUnset          = "unset"
 )
+
+var supportedCompletionShells = map[string]struct{}{
+	"bash": {},
+	"zsh":  {},
+	"fish": {},
+}
 
 type Config struct {
 	Mode              string
@@ -39,6 +48,7 @@ type Config struct {
 	Lang              string
 	Voice             string
 	APIKey            string
+	CompletionShell   string
 	ListVoices        bool
 	HasVoiceFlag      bool
 	HasLangFlag       bool
@@ -64,6 +74,9 @@ func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 		}
 		return cfg, nil
 	}
+	if len(args) > 0 && args[0] == ModeCompletion {
+		return parseCompletionCommand(args[1:])
+	}
 
 	cfg := Config{}
 	cfg.Mode = ModeRun
@@ -83,6 +96,7 @@ func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 		fmt.Fprintln(stderr, "Usage:")
 		fmt.Fprintln(stderr, helpUsageSetup)
 		fmt.Fprintln(stderr, helpUsageDoctor)
+		fmt.Fprintln(stderr, helpUsageCompletion)
 		fmt.Fprintln(stderr, helpUsageDefault)
 		fmt.Fprintln(stderr, helpUsageRun)
 		fmt.Fprintln(stderr, helpUsageList)
@@ -94,6 +108,7 @@ func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 		fmt.Fprintln(stderr, "Examples:")
 		fmt.Fprintln(stderr, helpExampleSetup)
 		fmt.Fprintln(stderr, helpExampleDoctor)
+		fmt.Fprintln(stderr, helpExampleCompletion)
 		fmt.Fprintln(stderr, helpExampleDefault)
 		fmt.Fprintln(stderr, helpExampleSpeak)
 		fmt.Fprintln(stderr, helpExampleVoices)
@@ -131,6 +146,23 @@ func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 		return cfg, fmt.Errorf("please specify either --save <path> or --play (or both)")
 	}
 
+	return cfg, nil
+}
+
+func parseCompletionCommand(args []string) (Config, error) {
+	cfg := Config{Mode: ModeCompletion}
+	if len(args) == 0 {
+		return cfg, fmt.Errorf("please provide a shell: bash, zsh, or fish")
+	}
+	if len(args) > 1 {
+		return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(args[1:], " "))
+	}
+
+	shell := strings.ToLower(strings.TrimSpace(args[0]))
+	if _, ok := supportedCompletionShells[shell]; !ok {
+		return cfg, fmt.Errorf("unsupported shell %q (supported: bash, zsh, fish)", args[0])
+	}
+	cfg.CompletionShell = shell
 	return cfg, nil
 }
 

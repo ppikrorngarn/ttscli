@@ -64,6 +64,8 @@ func Run(args []string, stdout, stderr io.Writer) error {
 		return runSetupCommand(stdout, stderr)
 	case cli.ModeDoctor:
 		return runDoctorCommand(stdout)
+	case cli.ModeCompletion:
+		return runCompletionCommand(cfg, stdout)
 	case "":
 		// For backward compatibility in tests that may stub ParseArgs manually.
 		cfg.Mode = cli.ModeRun
@@ -344,6 +346,22 @@ func runDoctorCommand(stdout io.Writer) error {
 	return nil
 }
 
+func runCompletionCommand(cfg cli.Config, stdout io.Writer) error {
+	var script string
+	switch cfg.CompletionShell {
+	case "bash":
+		script = bashCompletionScript()
+	case "zsh":
+		script = zshCompletionScript()
+	case "fish":
+		script = fishCompletionScript()
+	default:
+		return fmt.Errorf("unsupported shell %q (supported: bash, zsh, fish)", cfg.CompletionShell)
+	}
+	fmt.Fprint(stdout, script)
+	return nil
+}
+
 func runDefaultUnset(cfg cli.Config, stdout io.Writer) error {
 	if !cfg.HasVoiceFlag && !cfg.HasLangFlag && !cfg.HasAPIKeyFlag {
 		if err := clearDefaults(); err != nil {
@@ -569,4 +587,131 @@ func printDoctorChecks(stdout io.Writer, checks []doctorCheck) int {
 		}
 	}
 	return failed
+}
+
+func bashCompletionScript() string {
+	return `# bash completion for ttscli
+_ttscli_completion() {
+  local cur prev words cword
+  words=("${COMP_WORDS[@]}")
+  cword=$COMP_CWORD
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  if [[ ${COMP_CWORD} -gt 0 ]]; then
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+  else
+    prev=""
+  fi
+
+  if [[ ${cword} -eq 1 ]]; then
+    COMPREPLY=( $(compgen -W "setup doctor completion default --version --help" -- "${cur}") )
+    return
+  fi
+
+  case "${words[1]}" in
+    completion)
+      COMPREPLY=( $(compgen -W "bash zsh fish" -- "${cur}") )
+      ;;
+    default)
+      if [[ ${cword} -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "set get unset" -- "${cur}") )
+      else
+        case "${words[2]}" in
+          set)
+            COMPREPLY=( $(compgen -W "--voice --lang --api-key" -- "${cur}") )
+            ;;
+          unset)
+            COMPREPLY=( $(compgen -W "--voice --lang --api-key" -- "${cur}") )
+            ;;
+        esac
+      fi
+      ;;
+    *)
+      COMPREPLY=( $(compgen -W "--text --save --play --lang --voice --list-voices --version --help" -- "${cur}") )
+      ;;
+  esac
+}
+
+complete -F _ttscli_completion ttscli
+`
+}
+
+func zshCompletionScript() string {
+	return `#compdef ttscli
+
+_ttscli() {
+  local -a run_flags
+  run_flags=(
+    '--text[Text to convert to speech]:text:'
+    '--save[Path to save MP3 output]:file:_files'
+    '--play[Play audio immediately]'
+    '--lang[Language code]:lang:'
+    '--voice[Voice name]:voice:'
+    '--list-voices[List available voices]'
+    '--version[Print version and exit]'
+    '--help[Show help]'
+  )
+
+  if (( CURRENT == 2 )); then
+    _describe 'command' \
+      'setup:Run first-time setup' \
+      'doctor:Run diagnostics' \
+      'completion:Generate shell completions' \
+      'default:Manage saved defaults' \
+      '--version:Print version' \
+      '--help:Show help'
+    return
+  fi
+
+  case "$words[2]" in
+    completion)
+      _values 'shell' bash zsh fish
+      ;;
+    default)
+      if (( CURRENT == 3 )); then
+        _values 'subcommand' set get unset
+      else
+        case "$words[3]" in
+          set|unset)
+            _values 'flags' --voice --lang --api-key
+            ;;
+        esac
+      fi
+      ;;
+    *)
+      _arguments -s $run_flags
+      ;;
+  esac
+}
+
+_ttscli "$@"
+`
+}
+
+func fishCompletionScript() string {
+	return `# fish completion for ttscli
+complete -c ttscli -f -n "__fish_use_subcommand" -a setup -d "Run first-time setup"
+complete -c ttscli -f -n "__fish_use_subcommand" -a doctor -d "Run diagnostics"
+complete -c ttscli -f -n "__fish_use_subcommand" -a completion -d "Generate shell completions"
+complete -c ttscli -f -n "__fish_use_subcommand" -a default -d "Manage saved defaults"
+complete -c ttscli -f -n "__fish_use_subcommand" -l version -d "Print version and exit"
+
+complete -c ttscli -f -n "__fish_seen_subcommand_from completion" -a bash
+complete -c ttscli -f -n "__fish_seen_subcommand_from completion" -a zsh
+complete -c ttscli -f -n "__fish_seen_subcommand_from completion" -a fish
+
+complete -c ttscli -f -n "__fish_seen_subcommand_from default; and not __fish_seen_subcommand_from set get unset" -a set
+complete -c ttscli -f -n "__fish_seen_subcommand_from default; and not __fish_seen_subcommand_from set get unset" -a get
+complete -c ttscli -f -n "__fish_seen_subcommand_from default; and not __fish_seen_subcommand_from set get unset" -a unset
+complete -c ttscli -f -n "__fish_seen_subcommand_from set unset" -l voice
+complete -c ttscli -f -n "__fish_seen_subcommand_from set unset" -l lang
+complete -c ttscli -f -n "__fish_seen_subcommand_from set unset" -l api-key
+
+complete -c ttscli -l text -d "Text to convert to speech"
+complete -c ttscli -l save -d "Path to save MP3 output"
+complete -c ttscli -l play -d "Play audio immediately"
+complete -c ttscli -l lang -d "Language code"
+complete -c ttscli -l voice -d "Voice name"
+complete -c ttscli -l list-voices -d "List available voices"
+complete -c ttscli -l help -d "Show help"
+`
 }

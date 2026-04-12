@@ -89,17 +89,22 @@ You can run the CLI by executing the `./ttscli` binary.
 ./ttscli doctor
 ```
 
-**3. Play audio immediately (without saving):**
+**3. Generate shell completions:**
+```bash
+./ttscli completion zsh
+```
+
+**4. Play audio immediately (without saving):**
 ```bash
 ./ttscli --text "Hello world, this is a test." --play
 ```
 
-**4. Save audio to a file:**
+**5. Save audio to a file:**
 ```bash
 ./ttscli --text "Save this to a file." --save output.mp3
 ```
 
-**5. Save and play:**
+**6. Save and play:**
 ```bash
 ./ttscli --text "Save and play." --save output.mp3 --play
 ```
@@ -184,6 +189,35 @@ For a full list of flags, use the `--help` command:
 ./ttscli --help
 ```
 If you run `./ttscli` with no arguments, it will print a hint to run `--help`.
+
+## Shell Completion
+
+Generate completion scripts:
+
+```bash
+./ttscli completion bash
+./ttscli completion zsh
+./ttscli completion fish
+```
+
+Install examples:
+
+```bash
+# bash (Linux)
+./ttscli completion bash > /etc/bash_completion.d/ttscli
+```
+
+```bash
+# zsh (macOS/Linux)
+mkdir -p ~/.zsh/completions
+./ttscli completion zsh > ~/.zsh/completions/_ttscli
+```
+
+```bash
+# fish
+mkdir -p ~/.config/fish/completions
+./ttscli completion fish > ~/.config/fish/completions/ttscli.fish
+```
 
 ## Troubleshooting
 
