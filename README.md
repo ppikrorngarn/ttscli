@@ -264,7 +264,7 @@ ttscli completion fish > ~/.config/fish/completions/ttscli.fish
 ## Project Structure
 
 - `cmd/ttscli`: CLI entrypoint (`main`, `--version` handling).
-- `internal/app`: top-level application flow and dependency wiring.
+- `internal/app`: top-level application flow and dependency wiring (split across `run.go`, `command.go`, `defaults.go`, and `util.go`).
 - `internal/cli`: flag parsing and argument validation.
 - `internal/config`: user-level persisted defaults (`voice`, `lang`, `apiKey`).
 - `internal/tts`: Google TTS client and response parsing.
