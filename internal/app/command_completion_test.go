@@ -23,7 +23,9 @@ func TestRunCompletionBash(t *testing.T) {
 	}
 	out := stdout.String()
 	if !strings.Contains(out, "complete -F _ttscli_completion ttscli") ||
-		!strings.Contains(out, "speak save voices setup") {
+		!strings.Contains(out, "speak save voices setup") ||
+		!strings.Contains(out, "--text -t --lang -l --voice -v --help") ||
+		!strings.Contains(out, "--voice -v --lang -l --api-key -k") {
 		t.Fatalf("unexpected completion output: %q", out)
 	}
 }
@@ -42,7 +44,9 @@ func TestRunCompletionZsh(t *testing.T) {
 	}
 	out := stdout.String()
 	if !strings.Contains(out, "#compdef ttscli") ||
-		!strings.Contains(out, "completion:Generate shell completions") {
+		!strings.Contains(out, "completion:Generate shell completions") ||
+		!strings.Contains(out, "'-t[Text to convert to speech]:text:'") ||
+		!strings.Contains(out, "_values 'flags' --voice -v --lang -l --api-key -k") {
 		t.Fatalf("unexpected completion output: %q", out)
 	}
 }
@@ -61,7 +65,9 @@ func TestRunCompletionFish(t *testing.T) {
 	}
 	out := stdout.String()
 	if !strings.Contains(out, "complete -c ttscli") ||
-		!strings.Contains(out, "-a completion") {
+		!strings.Contains(out, "-a completion") ||
+		!strings.Contains(out, "-l text -s t") ||
+		!strings.Contains(out, "-l api-key -s k") {
 		t.Fatalf("unexpected completion output: %q", out)
 	}
 }

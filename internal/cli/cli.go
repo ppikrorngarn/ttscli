@@ -126,17 +126,20 @@ func parseSpeakCommand(args []string, stderr io.Writer) (Config, error) {
 	fs.SetOutput(stderr)
 
 	fs.StringVar(&cfg.Text, "text", "", "Text to convert to speech")
+	fs.StringVar(&cfg.Text, "t", "", "Text to convert to speech (shorthand)")
 	fs.StringVar(&cfg.Lang, "lang", DefaultLanguage, "Language code")
+	fs.StringVar(&cfg.Lang, "l", DefaultLanguage, "Language code (shorthand)")
 	fs.StringVar(&cfg.Voice, "voice", DefaultVoice, "Voice name")
+	fs.StringVar(&cfg.Voice, "v", DefaultVoice, "Voice name (shorthand)")
 
 	if err := fs.Parse(args); err != nil {
 		return cfg, err
 	}
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
-		case "voice":
+		case "voice", "v":
 			cfg.HasVoiceFlag = true
-		case "lang":
+		case "lang", "l":
 			cfg.HasLangFlag = true
 		}
 	})
@@ -157,18 +160,22 @@ func parseSaveCommand(args []string, stderr io.Writer) (Config, error) {
 	fs.SetOutput(stderr)
 
 	fs.StringVar(&cfg.Text, "text", "", "Text to convert to speech")
+	fs.StringVar(&cfg.Text, "t", "", "Text to convert to speech (shorthand)")
 	fs.StringVar(&cfg.SavePath, "out", "", "Path to save the output MP3 file (e.g., output.mp3)")
+	fs.StringVar(&cfg.SavePath, "o", "", "Path to save the output MP3 file (shorthand)")
 	fs.StringVar(&cfg.Lang, "lang", DefaultLanguage, "Language code")
+	fs.StringVar(&cfg.Lang, "l", DefaultLanguage, "Language code (shorthand)")
 	fs.StringVar(&cfg.Voice, "voice", DefaultVoice, "Voice name")
+	fs.StringVar(&cfg.Voice, "v", DefaultVoice, "Voice name (shorthand)")
 
 	if err := fs.Parse(args); err != nil {
 		return cfg, err
 	}
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
-		case "voice":
+		case "voice", "v":
 			cfg.HasVoiceFlag = true
-		case "lang":
+		case "lang", "l":
 			cfg.HasLangFlag = true
 		}
 	})
@@ -190,12 +197,13 @@ func parseVoicesCommand(args []string, stderr io.Writer) (Config, error) {
 	fs := flag.NewFlagSet(appName+" voices", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.StringVar(&cfg.Lang, "lang", DefaultLanguage, "Language code")
+	fs.StringVar(&cfg.Lang, "l", DefaultLanguage, "Language code (shorthand)")
 
 	if err := fs.Parse(args); err != nil {
 		return cfg, err
 	}
 	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "lang" {
+		if f.Name == "lang" || f.Name == "l" {
 			cfg.HasLangFlag = true
 		}
 	})
@@ -247,18 +255,21 @@ func parseDefaultCommand(args []string, stderr io.Writer) (Config, error) {
 		fs := flag.NewFlagSet(appName+" default set", flag.ContinueOnError)
 		fs.SetOutput(stderr)
 		fs.StringVar(&cfg.Voice, "voice", "", "Default voice name")
+		fs.StringVar(&cfg.Voice, "v", "", "Default voice name (shorthand)")
 		fs.StringVar(&cfg.Lang, "lang", "", "Default language code")
+		fs.StringVar(&cfg.Lang, "l", "", "Default language code (shorthand)")
 		fs.StringVar(&cfg.APIKey, "api-key", "", "Default Google Cloud Text-to-Speech API key")
+		fs.StringVar(&cfg.APIKey, "k", "", "Default Google Cloud Text-to-Speech API key (shorthand)")
 		if err := fs.Parse(args[1:]); err != nil {
 			return cfg, err
 		}
 		fs.Visit(func(f *flag.Flag) {
 			switch f.Name {
-			case "voice":
+			case "voice", "v":
 				cfg.HasVoiceFlag = true
-			case "lang":
+			case "lang", "l":
 				cfg.HasLangFlag = true
-			case "api-key":
+			case "api-key", "k":
 				cfg.HasAPIKeyFlag = true
 			}
 		})
@@ -273,8 +284,11 @@ func parseDefaultCommand(args []string, stderr io.Writer) (Config, error) {
 		fs := flag.NewFlagSet(appName+" default unset", flag.ContinueOnError)
 		fs.SetOutput(stderr)
 		fs.BoolVar(&cfg.HasVoiceFlag, "voice", false, "Unset saved default voice")
+		fs.BoolVar(&cfg.HasVoiceFlag, "v", false, "Unset saved default voice (shorthand)")
 		fs.BoolVar(&cfg.HasLangFlag, "lang", false, "Unset saved default language")
+		fs.BoolVar(&cfg.HasLangFlag, "l", false, "Unset saved default language (shorthand)")
 		fs.BoolVar(&cfg.HasAPIKeyFlag, "api-key", false, "Unset saved API key")
+		fs.BoolVar(&cfg.HasAPIKeyFlag, "k", false, "Unset saved API key (shorthand)")
 		if err := fs.Parse(args[1:]); err != nil {
 			return cfg, err
 		}

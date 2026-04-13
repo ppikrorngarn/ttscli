@@ -93,24 +93,32 @@ If you built locally with `make build`, run `./ttscli ...` from the repo root.
 
 | Flag | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `--text` | string | `""` | Required for `speak`. |
-| `--lang` | string | `en-US` | Language code for speak (or saved default, if configured). |
-| `--voice` | string | `en-US-Neural2-F` | Voice name for synth (or saved default, if configured). |
+| `--text` | string | `""` | Required for `speak`. Alias: `-t`. |
+| `--lang` | string | `en-US` | Language code for speak (or saved default, if configured). Alias: `-l`. |
+| `--voice` | string | `en-US-Neural2-F` | Voice name for synth (or saved default, if configured). Alias: `-v`. |
 
 ### `save` Flags
 
 | Flag | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `--text` | string | `""` | Required for `save`. |
-| `--out` | string | `""` | Required output MP3 path. |
-| `--lang` | string | `en-US` | Language code for save (or saved default, if configured). |
-| `--voice` | string | `en-US-Neural2-F` | Voice name for save (or saved default, if configured). |
+| `--text` | string | `""` | Required for `save`. Alias: `-t`. |
+| `--out` | string | `""` | Required output MP3 path. Alias: `-o`. |
+| `--lang` | string | `en-US` | Language code for save (or saved default, if configured). Alias: `-l`. |
+| `--voice` | string | `en-US-Neural2-F` | Voice name for save (or saved default, if configured). Alias: `-v`. |
 
 ### `voices` Flags
 
 | Flag | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `--lang` | string | `en-US` | Optional language filter for voice listing. |
+| `--lang` | string | `en-US` | Optional language filter for voice listing. Alias: `-l`. |
+
+### `default set` / `default unset` Flags
+
+| Flag | Applies To | Notes |
+| --- | --- | --- |
+| `--voice` | `set`, `unset` | Voice default value or selector. Alias: `-v`. |
+| `--lang` | `set`, `unset` | Language default value or selector. Alias: `-l`. |
+| `--api-key` | `set`, `unset` | API key default value or selector. Alias: `-k`. |
 
 ### Basic Commands
 
@@ -142,6 +150,16 @@ ttscli speak --text "Hello world, this is a test."
 **5. Save audio to a file:**
 ```bash
 ttscli save --text "Save this to a file." --out output.mp3
+```
+
+### Alias Quick Examples
+
+```bash
+ttscli speak -t "Hello world, this is a test."
+ttscli save -t "Save this to a file." -o output.mp3
+ttscli voices -l en-GB
+ttscli default set -v en-US-Chirp3-HD-Achernar -l en-US
+ttscli default unset -v -k
 ```
 
 ### Voice and Language Selection

@@ -472,13 +472,13 @@ _ttscli_completion() {
 
   case "${words[1]}" in
     speak)
-      COMPREPLY=( $(compgen -W "--text --lang --voice --help" -- "${cur}") )
+      COMPREPLY=( $(compgen -W "--text -t --lang -l --voice -v --help" -- "${cur}") )
       ;;
     save)
-      COMPREPLY=( $(compgen -W "--text --out --lang --voice --help" -- "${cur}") )
+      COMPREPLY=( $(compgen -W "--text -t --out -o --lang -l --voice -v --help" -- "${cur}") )
       ;;
     voices)
-      COMPREPLY=( $(compgen -W "--lang --help" -- "${cur}") )
+      COMPREPLY=( $(compgen -W "--lang -l --help" -- "${cur}") )
       ;;
     completion)
       COMPREPLY=( $(compgen -W "bash zsh fish" -- "${cur}") )
@@ -489,10 +489,10 @@ _ttscli_completion() {
       else
         case "${words[2]}" in
           set)
-            COMPREPLY=( $(compgen -W "--voice --lang --api-key" -- "${cur}") )
+            COMPREPLY=( $(compgen -W "--voice -v --lang -l --api-key -k" -- "${cur}") )
             ;;
           unset)
-            COMPREPLY=( $(compgen -W "--voice --lang --api-key" -- "${cur}") )
+            COMPREPLY=( $(compgen -W "--voice -v --lang -l --api-key -k" -- "${cur}") )
             ;;
         esac
       fi
@@ -512,19 +512,27 @@ _ttscli() {
   local -a save_flags
   local -a voices_flags
   speak_flags=(
+    '-t[Text to convert to speech]:text:'
     '--text[Text to convert to speech]:text:'
+    '-l[Language code]:lang:'
     '--lang[Language code]:lang:'
+    '-v[Voice name]:voice:'
     '--voice[Voice name]:voice:'
     '--help[Show help]'
   )
   save_flags=(
+    '-t[Text to convert to speech]:text:'
     '--text[Text to convert to speech]:text:'
+    '-o[Path to save MP3 output]:file:_files'
     '--out[Path to save MP3 output]:file:_files'
+    '-l[Language code]:lang:'
     '--lang[Language code]:lang:'
+    '-v[Voice name]:voice:'
     '--voice[Voice name]:voice:'
     '--help[Show help]'
   )
   voices_flags=(
+    '-l[Language code]:lang:'
     '--lang[Language code]:lang:'
     '--help[Show help]'
   )
@@ -562,7 +570,7 @@ _ttscli() {
       else
         case "$words[3]" in
           set|unset)
-            _values 'flags' --voice --lang --api-key
+            _values 'flags' --voice -v --lang -l --api-key -k
             ;;
         esac
       fi
@@ -592,18 +600,18 @@ complete -c ttscli -f -n "__fish_seen_subcommand_from completion" -a fish
 complete -c ttscli -f -n "__fish_seen_subcommand_from default; and not __fish_seen_subcommand_from set get unset" -a set
 complete -c ttscli -f -n "__fish_seen_subcommand_from default; and not __fish_seen_subcommand_from set get unset" -a get
 complete -c ttscli -f -n "__fish_seen_subcommand_from default; and not __fish_seen_subcommand_from set get unset" -a unset
-complete -c ttscli -f -n "__fish_seen_subcommand_from set unset" -l voice
-complete -c ttscli -f -n "__fish_seen_subcommand_from set unset" -l lang
-complete -c ttscli -f -n "__fish_seen_subcommand_from set unset" -l api-key
+complete -c ttscli -f -n "__fish_seen_subcommand_from set unset" -l voice -s v
+complete -c ttscli -f -n "__fish_seen_subcommand_from set unset" -l lang -s l
+complete -c ttscli -f -n "__fish_seen_subcommand_from set unset" -l api-key -s k
 
-complete -c ttscli -f -n "__fish_seen_subcommand_from speak" -l text -d "Text to convert to speech"
-complete -c ttscli -f -n "__fish_seen_subcommand_from speak" -l lang -d "Language code"
-complete -c ttscli -f -n "__fish_seen_subcommand_from speak" -l voice -d "Voice name"
-complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l text -d "Text to convert to speech"
-complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l out -d "Path to save MP3 output"
-complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l lang -d "Language code"
-complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l voice -d "Voice name"
-complete -c ttscli -f -n "__fish_seen_subcommand_from voices" -l lang -d "Language code"
+complete -c ttscli -f -n "__fish_seen_subcommand_from speak" -l text -s t -d "Text to convert to speech"
+complete -c ttscli -f -n "__fish_seen_subcommand_from speak" -l lang -s l -d "Language code"
+complete -c ttscli -f -n "__fish_seen_subcommand_from speak" -l voice -s v -d "Voice name"
+complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l text -s t -d "Text to convert to speech"
+complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l out -s o -d "Path to save MP3 output"
+complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l lang -s l -d "Language code"
+complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l voice -s v -d "Voice name"
+complete -c ttscli -f -n "__fish_seen_subcommand_from voices" -l lang -s l -d "Language code"
 complete -c ttscli -f -n "__fish_seen_subcommand_from speak save voices" -l help -d "Show help"
 `
 }

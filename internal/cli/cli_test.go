@@ -24,6 +24,23 @@ func TestParseCLIArgsVoices(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsVoicesShorthandLang(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"voices", "-l", "en-GB"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Mode != ModeVoices || !cfg.ListVoices {
+		t.Fatalf("expected voices mode config, got %+v", cfg)
+	}
+	if cfg.Lang != "en-GB" {
+		t.Fatalf("expected lang en-GB, got %q", cfg.Lang)
+	}
+	if !cfg.HasLangFlag {
+		t.Fatalf("expected HasLangFlag=true")
+	}
+}
+
 func TestParseCLIArgsSpeakMissingText(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := ParseArgs([]string{"speak"}, &stderr)
@@ -80,6 +97,29 @@ func TestParseCLIArgsSpeakTracksVoiceAndLangFlags(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsSpeakShorthandFlags(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"speak", "-t", "hello", "-v", "en-US-Chirp3-HD-Achernar", "-l", "en-US"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Mode != ModeSpeak {
+		t.Fatalf("expected mode %q, got %+v", ModeSpeak, cfg)
+	}
+	if cfg.Text != "hello" {
+		t.Fatalf("expected text hello, got %q", cfg.Text)
+	}
+	if cfg.Voice != "en-US-Chirp3-HD-Achernar" || cfg.Lang != "en-US" {
+		t.Fatalf("unexpected voice/lang values: %+v", cfg)
+	}
+	if !cfg.HasVoiceFlag || !cfg.HasLangFlag {
+		t.Fatalf("expected voice/lang shorthand flags to be marked as set, got %+v", cfg)
+	}
+	if !cfg.Play {
+		t.Fatalf("expected Play=true for speak, got %+v", cfg)
+	}
+}
+
 func TestParseCLIArgsSaveMissingText(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := ParseArgs([]string{"save", "--out", "out.mp3"}, &stderr)
@@ -113,6 +153,29 @@ func TestParseCLIArgsValidSave(t *testing.T) {
 	}
 	if cfg.Text != "hello" || cfg.SavePath != "out.mp3" {
 		t.Fatalf("unexpected save config: %+v", cfg)
+	}
+	if cfg.Play {
+		t.Fatalf("expected Play=false for save, got %+v", cfg)
+	}
+}
+
+func TestParseCLIArgsValidSaveShorthandFlags(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"save", "-t", "hello", "-o", "out.mp3", "-l", "en-US", "-v", "en-US-Chirp3-HD-Achernar"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Mode != ModeSave {
+		t.Fatalf("expected mode %q, got %+v", ModeSave, cfg)
+	}
+	if cfg.Text != "hello" || cfg.SavePath != "out.mp3" {
+		t.Fatalf("unexpected save config: %+v", cfg)
+	}
+	if cfg.Voice != "en-US-Chirp3-HD-Achernar" || cfg.Lang != "en-US" {
+		t.Fatalf("unexpected voice/lang values: %+v", cfg)
+	}
+	if !cfg.HasVoiceFlag || !cfg.HasLangFlag {
+		t.Fatalf("expected voice/lang shorthand flags to be marked as set, got %+v", cfg)
 	}
 	if cfg.Play {
 		t.Fatalf("expected Play=false for save, got %+v", cfg)
@@ -196,6 +259,20 @@ func TestParseCLIArgsDefaultSetAPIKeyOnly(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsDefaultSetShorthandFlags(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"default", "set", "-v", "en-US-Chirp3-HD-Achernar", "-l", "en-US", "-k", "k-12345"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if !cfg.HasVoiceFlag || !cfg.HasLangFlag || !cfg.HasAPIKeyFlag {
+		t.Fatalf("expected shorthand flags to be marked as set, got %+v", cfg)
+	}
+	if cfg.Voice != "en-US-Chirp3-HD-Achernar" || cfg.Lang != "en-US" || cfg.APIKey != "k-12345" {
+		t.Fatalf("unexpected shorthand default set values: %+v", cfg)
+	}
+}
+
 func TestParseCLIArgsDefaultSetRequiresAtLeastOneFlag(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := ParseArgs([]string{"default", "set"}, &stderr)
@@ -246,6 +323,17 @@ func TestParseCLIArgsDefaultUnsetSelectors(t *testing.T) {
 	}
 	if !cfg.HasVoiceFlag || !cfg.HasAPIKeyFlag || cfg.HasLangFlag {
 		t.Fatalf("unexpected unset selectors: %+v", cfg)
+	}
+}
+
+func TestParseCLIArgsDefaultUnsetShorthandSelectors(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"default", "unset", "-v", "-k"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if !cfg.HasVoiceFlag || !cfg.HasAPIKeyFlag || cfg.HasLangFlag {
+		t.Fatalf("unexpected shorthand unset selectors: %+v", cfg)
 	}
 }
 
