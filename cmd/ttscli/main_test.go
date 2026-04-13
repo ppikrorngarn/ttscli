@@ -17,7 +17,7 @@ func TestRunMainSuccess(t *testing.T) {
 		return nil
 	}
 
-	code := runMain([]string{"--text", "hello", "--play"}, &bytes.Buffer{}, &bytes.Buffer{})
+	code := runMain([]string{"speak", "--text", "hello"}, &bytes.Buffer{}, &bytes.Buffer{})
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d", code)
 	}
@@ -96,7 +96,7 @@ func TestHasVersionFlag(t *testing.T) {
 		{name: "exact flag", args: []string{"--version"}, want: true},
 		{name: "assigned true", args: []string{"--version=true"}, want: true},
 		{name: "assigned false", args: []string{"--version=false"}, want: false},
-		{name: "missing", args: []string{"--text", "hello"}, want: false},
+		{name: "missing", args: []string{"speak", "--text", "hello"}, want: false},
 	}
 
 	for _, tt := range tests {

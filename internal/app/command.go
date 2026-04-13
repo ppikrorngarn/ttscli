@@ -466,11 +466,20 @@ _ttscli_completion() {
   fi
 
   if [[ ${cword} -eq 1 ]]; then
-    COMPREPLY=( $(compgen -W "setup doctor completion default --version --help" -- "${cur}") )
+    COMPREPLY=( $(compgen -W "speak save voices setup doctor completion default --version --help" -- "${cur}") )
     return
   fi
 
   case "${words[1]}" in
+    speak)
+      COMPREPLY=( $(compgen -W "--text --lang --voice --help" -- "${cur}") )
+      ;;
+    save)
+      COMPREPLY=( $(compgen -W "--text --out --lang --voice --help" -- "${cur}") )
+      ;;
+    voices)
+      COMPREPLY=( $(compgen -W "--lang --help" -- "${cur}") )
+      ;;
     completion)
       COMPREPLY=( $(compgen -W "bash zsh fish" -- "${cur}") )
       ;;
@@ -488,9 +497,6 @@ _ttscli_completion() {
         esac
       fi
       ;;
-    *)
-      COMPREPLY=( $(compgen -W "--text --save --play --lang --voice --list-voices --version --help" -- "${cur}") )
-      ;;
   esac
 }
 
@@ -502,20 +508,32 @@ func zshCompletionScript() string {
 	return `#compdef ttscli
 
 _ttscli() {
-  local -a run_flags
-  run_flags=(
+  local -a speak_flags
+  local -a save_flags
+  local -a voices_flags
+  speak_flags=(
     '--text[Text to convert to speech]:text:'
-    '--save[Path to save MP3 output]:file:_files'
-    '--play[Play audio immediately]'
     '--lang[Language code]:lang:'
     '--voice[Voice name]:voice:'
-    '--list-voices[List available voices]'
-    '--version[Print version and exit]'
+    '--help[Show help]'
+  )
+  save_flags=(
+    '--text[Text to convert to speech]:text:'
+    '--out[Path to save MP3 output]:file:_files'
+    '--lang[Language code]:lang:'
+    '--voice[Voice name]:voice:'
+    '--help[Show help]'
+  )
+  voices_flags=(
+    '--lang[Language code]:lang:'
     '--help[Show help]'
   )
 
   if (( CURRENT == 2 )); then
     _describe 'command' \
+      'speak:Synthesize speech' \
+      'save:Synthesize and save MP3' \
+      'voices:List available voices' \
       'setup:Run first-time setup' \
       'doctor:Run diagnostics' \
       'completion:Generate shell completions' \
@@ -526,6 +544,15 @@ _ttscli() {
   fi
 
   case "$words[2]" in
+    speak)
+      _arguments -s $speak_flags
+      ;;
+    save)
+      _arguments -s $save_flags
+      ;;
+    voices)
+      _arguments -s $voices_flags
+      ;;
     completion)
       _values 'shell' bash zsh fish
       ;;
@@ -540,9 +567,6 @@ _ttscli() {
         esac
       fi
       ;;
-    *)
-      _arguments -s $run_flags
-      ;;
   esac
 }
 
@@ -552,6 +576,9 @@ _ttscli "$@"
 
 func fishCompletionScript() string {
 	return `# fish completion for ttscli
+complete -c ttscli -f -n "__fish_use_subcommand" -a speak -d "Synthesize speech"
+complete -c ttscli -f -n "__fish_use_subcommand" -a save -d "Synthesize and save MP3"
+complete -c ttscli -f -n "__fish_use_subcommand" -a voices -d "List available voices"
 complete -c ttscli -f -n "__fish_use_subcommand" -a setup -d "Run first-time setup"
 complete -c ttscli -f -n "__fish_use_subcommand" -a doctor -d "Run diagnostics"
 complete -c ttscli -f -n "__fish_use_subcommand" -a completion -d "Generate shell completions"
@@ -569,12 +596,14 @@ complete -c ttscli -f -n "__fish_seen_subcommand_from set unset" -l voice
 complete -c ttscli -f -n "__fish_seen_subcommand_from set unset" -l lang
 complete -c ttscli -f -n "__fish_seen_subcommand_from set unset" -l api-key
 
-complete -c ttscli -l text -d "Text to convert to speech"
-complete -c ttscli -l save -d "Path to save MP3 output"
-complete -c ttscli -l play -d "Play audio immediately"
-complete -c ttscli -l lang -d "Language code"
-complete -c ttscli -l voice -d "Voice name"
-complete -c ttscli -l list-voices -d "List available voices"
-complete -c ttscli -l help -d "Show help"
+complete -c ttscli -f -n "__fish_seen_subcommand_from speak" -l text -d "Text to convert to speech"
+complete -c ttscli -f -n "__fish_seen_subcommand_from speak" -l lang -d "Language code"
+complete -c ttscli -f -n "__fish_seen_subcommand_from speak" -l voice -d "Voice name"
+complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l text -d "Text to convert to speech"
+complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l out -d "Path to save MP3 output"
+complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l lang -d "Language code"
+complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l voice -d "Voice name"
+complete -c ttscli -f -n "__fish_seen_subcommand_from voices" -l lang -d "Language code"
+complete -c ttscli -f -n "__fish_seen_subcommand_from speak save voices" -l help -d "Show help"
 `
 }

@@ -233,7 +233,7 @@ func TestRunUsesSavedAPIKeyWhenEnvMissing(t *testing.T) {
 
 	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
 		return cli.Config{
-			Mode:       cli.ModeRun,
+			Mode:       cli.ModeSpeak,
 			Text:       "hello",
 			Play:       true,
 			Lang:       cli.DefaultLanguage,
@@ -258,7 +258,7 @@ func TestRunUsesSavedAPIKeyWhenEnvMissing(t *testing.T) {
 	}
 	playAudio = func(audioBytes []byte, stdout, stderr io.Writer) error { return nil }
 
-	err := Run([]string{"--text", "hello", "--play"}, &bytes.Buffer{}, &bytes.Buffer{})
+	err := Run([]string{"speak", "--text", "hello"}, &bytes.Buffer{}, &bytes.Buffer{})
 	if err != nil {
 		t.Fatalf("Run returned error: %v", err)
 	}
@@ -273,7 +273,7 @@ func TestRunEnvAPIKeyOverridesSavedKey(t *testing.T) {
 
 	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
 		return cli.Config{
-			Mode:       cli.ModeRun,
+			Mode:       cli.ModeSpeak,
 			Text:       "hello",
 			Play:       true,
 			Lang:       cli.DefaultLanguage,
@@ -298,7 +298,7 @@ func TestRunEnvAPIKeyOverridesSavedKey(t *testing.T) {
 	}
 	playAudio = func(audioBytes []byte, stdout, stderr io.Writer) error { return nil }
 
-	err := Run([]string{"--text", "hello", "--play"}, &bytes.Buffer{}, &bytes.Buffer{})
+	err := Run([]string{"speak", "--text", "hello"}, &bytes.Buffer{}, &bytes.Buffer{})
 	if err != nil {
 		t.Fatalf("Run returned error: %v", err)
 	}
@@ -313,7 +313,7 @@ func TestRunUsesPersistedDefaultsWhenFlagsNotProvided(t *testing.T) {
 
 	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
 		return cli.Config{
-			Mode:       "run",
+			Mode:       cli.ModeSpeak,
 			Text:       "hello",
 			Play:       true,
 			Lang:       cli.DefaultLanguage,
@@ -339,7 +339,7 @@ func TestRunUsesPersistedDefaultsWhenFlagsNotProvided(t *testing.T) {
 	}
 	playAudio = func(audioBytes []byte, stdout, stderr io.Writer) error { return nil }
 
-	if err := Run([]string{"--text", "hello", "--play"}, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+	if err := Run([]string{"speak", "--text", "hello"}, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
 		t.Fatalf("Run returned error: %v", err)
 	}
 	if gotVoice != "en-US-Chirp3-HD-Achernar" || gotLang != "en-US" {
@@ -353,7 +353,7 @@ func TestRunExplicitFlagsOverridePersistedDefaults(t *testing.T) {
 
 	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
 		return cli.Config{
-			Mode:         "run",
+			Mode:         cli.ModeSpeak,
 			Text:         "hello",
 			Play:         true,
 			Lang:         "en-GB",
@@ -380,7 +380,7 @@ func TestRunExplicitFlagsOverridePersistedDefaults(t *testing.T) {
 	}
 	playAudio = func(audioBytes []byte, stdout, stderr io.Writer) error { return nil }
 
-	if err := Run([]string{"--text", "hello", "--play", "--voice", "en-GB-Neural2-B", "--lang", "en-GB"}, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+	if err := Run([]string{"speak", "--text", "hello", "--voice", "en-GB-Neural2-B", "--lang", "en-GB"}, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
 		t.Fatalf("Run returned error: %v", err)
 	}
 	if gotVoice != "en-GB-Neural2-B" || gotLang != "en-GB" {

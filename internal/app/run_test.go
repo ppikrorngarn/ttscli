@@ -382,11 +382,11 @@ func TestRunEndToEndFlowWithRealParseArgs(t *testing.T) {
 
 	var stdout bytes.Buffer
 	err := Run([]string{
+		"save",
 		"--text", "hello world",
 		"--lang", "en-GB",
 		"--voice", "en-GB-Neural2-B",
-		"--save", "out.mp3",
-		"--play",
+		"--out", "out.mp3",
 	}, &stdout, &bytes.Buffer{})
 	if err != nil {
 		t.Fatalf("Run returned error: %v", err)
@@ -398,14 +398,13 @@ func TestRunEndToEndFlowWithRealParseArgs(t *testing.T) {
 	if gotEncoding != tts.AudioEncodingMP3 {
 		t.Fatalf("unexpected encoding: %q", gotEncoding)
 	}
-	if !saved || !played {
-		t.Fatalf("expected saved and played, got saved=%v played=%v", saved, played)
+	if !saved || played {
+		t.Fatalf("expected saved and not played, got saved=%v played=%v", saved, played)
 	}
 
 	out := stdout.String()
 	if !strings.Contains(out, "Synthesizing speech...") ||
-		!strings.Contains(out, "Saved audio to: out.mp3") ||
-		!strings.Contains(out, "Playing audio...") {
+		!strings.Contains(out, "Saved audio to: out.mp3") {
 		t.Fatalf("unexpected stdout: %q", out)
 	}
 }

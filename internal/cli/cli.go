@@ -12,19 +12,23 @@ const (
 	DefaultLanguage       = "en-US"
 	DefaultVoice          = "en-US-Neural2-F"
 	helpTitle             = "GCP Text-to-Speech CLI"
-	helpUsageRun          = `  ttscli --text "Hello world" --play`
-	helpUsageList         = "  ttscli --list-voices --lang en-GB"
+	helpUsageSpeak        = `  ttscli speak --text "Hello world"`
+	helpUsageSave         = `  ttscli save --text "Hello world" --out output.mp3`
+	helpUsageVoices       = "  ttscli voices --lang en-GB"
 	helpUsageSetup        = "  ttscli setup"
 	helpUsageDoctor       = "  ttscli doctor"
 	helpUsageCompletion   = "  ttscli completion <bash|zsh|fish>"
 	helpUsageDefault      = "  ttscli default <set|get|unset> [flags]"
-	helpExampleSpeak      = `  ttscli --text "Hello world" --play`
-	helpExampleVoices     = "  ttscli --list-voices --lang en-GB"
+	helpExampleSpeak      = `  ttscli speak --text "Hello world"`
+	helpExampleSave       = `  ttscli save --text "Hello world" --out output.mp3`
+	helpExampleVoices     = "  ttscli voices --lang en-GB"
 	helpExampleSetup      = "  ttscli setup"
 	helpExampleDoctor     = "  ttscli doctor"
 	helpExampleCompletion = "  ttscli completion zsh"
 	helpExampleDefault    = "  ttscli default set --voice en-US-Chirp3-HD-Achernar --lang en-US"
-	ModeRun               = "run"
+	ModeSpeak             = "speak"
+	ModeSave              = "save"
+	ModeVoices            = "voices"
 	ModeDefault           = "default"
 	ModeSetup             = "setup"
 	ModeDoctor            = "doctor"
@@ -57,6 +61,24 @@ type Config struct {
 }
 
 func ParseArgs(args []string, stderr io.Writer) (Config, error) {
+	if len(args) == 0 {
+		return Config{}, fmt.Errorf("no command provided; run \"ttscli --help\" for usage")
+	}
+
+	if args[0] == "--help" || args[0] == "-h" || args[0] == "help" {
+		printHelp(stderr)
+		return Config{}, flag.ErrHelp
+	}
+
+	if len(args) > 0 && args[0] == ModeSpeak {
+		return parseSpeakCommand(args[1:], stderr)
+	}
+	if len(args) > 0 && args[0] == ModeSave {
+		return parseSaveCommand(args[1:], stderr)
+	}
+	if len(args) > 0 && args[0] == ModeVoices {
+		return parseVoicesCommand(args[1:], stderr)
+	}
 	if len(args) > 0 && args[0] == ModeDefault {
 		return parseDefaultCommand(args[1:], stderr)
 	}
@@ -78,75 +100,7 @@ func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 		return parseCompletionCommand(args[1:])
 	}
 
-	cfg := Config{}
-	cfg.Mode = ModeRun
-	fs := flag.NewFlagSet(appName, flag.ContinueOnError)
-	fs.SetOutput(stderr)
-
-	fs.StringVar(&cfg.Text, "text", "", "Text to convert to speech")
-	fs.StringVar(&cfg.SavePath, "save", "", "Path to save the output MP3 file (e.g., output.mp3)")
-	fs.BoolVar(&cfg.Play, "play", false, "Play the audio immediately")
-	fs.StringVar(&cfg.Lang, "lang", DefaultLanguage, "Language code")
-	fs.StringVar(&cfg.Voice, "voice", DefaultVoice, "Voice name")
-	fs.BoolVar(&cfg.ListVoices, "list-voices", false, "List available voices (filtered by --lang)")
-
-	fs.Usage = func() {
-		fmt.Fprintln(stderr, helpTitle)
-		fmt.Fprintln(stderr)
-		fmt.Fprintln(stderr, "Usage:")
-		fmt.Fprintln(stderr, helpUsageSetup)
-		fmt.Fprintln(stderr, helpUsageDoctor)
-		fmt.Fprintln(stderr, helpUsageCompletion)
-		fmt.Fprintln(stderr, helpUsageDefault)
-		fmt.Fprintln(stderr, helpUsageRun)
-		fmt.Fprintln(stderr, helpUsageList)
-		fmt.Fprintln(stderr, "  ttscli --version")
-		fmt.Fprintln(stderr)
-		fmt.Fprintln(stderr, "Run Flags:")
-		fs.PrintDefaults()
-		fmt.Fprintln(stderr)
-		fmt.Fprintln(stderr, "Examples:")
-		fmt.Fprintln(stderr, helpExampleSetup)
-		fmt.Fprintln(stderr, helpExampleDoctor)
-		fmt.Fprintln(stderr, helpExampleCompletion)
-		fmt.Fprintln(stderr, helpExampleDefault)
-		fmt.Fprintln(stderr, helpExampleSpeak)
-		fmt.Fprintln(stderr, helpExampleVoices)
-	}
-
-	if err := fs.Parse(args); err != nil {
-		return cfg, err
-	}
-	fs.Visit(func(f *flag.Flag) {
-		switch f.Name {
-		case "voice":
-			cfg.HasVoiceFlag = true
-		case "lang":
-			cfg.HasLangFlag = true
-		}
-	})
-
-	if fs.NArg() > 0 {
-		return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(fs.Args(), " "))
-	}
-
-	if cfg.ListVoices {
-		return cfg, nil
-	}
-
-	if len(args) == 0 {
-		return cfg, fmt.Errorf("no arguments provided; run \"ttscli --help\" for usage")
-	}
-
-	if cfg.Text == "" {
-		return cfg, fmt.Errorf("please provide text using the --text flag")
-	}
-
-	if cfg.SavePath == "" && !cfg.Play {
-		return cfg, fmt.Errorf("please specify either --save <path> or --play (or both)")
-	}
-
-	return cfg, nil
+	return Config{}, fmt.Errorf("unsupported command %q (use: speak, save, voices, setup, doctor, completion, default)", args[0])
 }
 
 func parseCompletionCommand(args []string) (Config, error) {
@@ -164,6 +118,116 @@ func parseCompletionCommand(args []string) (Config, error) {
 	}
 	cfg.CompletionShell = shell
 	return cfg, nil
+}
+
+func parseSpeakCommand(args []string, stderr io.Writer) (Config, error) {
+	cfg := Config{Mode: ModeSpeak}
+	fs := flag.NewFlagSet(appName+" speak", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+
+	fs.StringVar(&cfg.Text, "text", "", "Text to convert to speech")
+	fs.StringVar(&cfg.Lang, "lang", DefaultLanguage, "Language code")
+	fs.StringVar(&cfg.Voice, "voice", DefaultVoice, "Voice name")
+
+	if err := fs.Parse(args); err != nil {
+		return cfg, err
+	}
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "voice":
+			cfg.HasVoiceFlag = true
+		case "lang":
+			cfg.HasLangFlag = true
+		}
+	})
+
+	if fs.NArg() > 0 {
+		return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(fs.Args(), " "))
+	}
+	if cfg.Text == "" {
+		return cfg, fmt.Errorf("please provide text using the --text flag")
+	}
+	cfg.Play = true
+	return cfg, nil
+}
+
+func parseSaveCommand(args []string, stderr io.Writer) (Config, error) {
+	cfg := Config{Mode: ModeSave}
+	fs := flag.NewFlagSet(appName+" save", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+
+	fs.StringVar(&cfg.Text, "text", "", "Text to convert to speech")
+	fs.StringVar(&cfg.SavePath, "out", "", "Path to save the output MP3 file (e.g., output.mp3)")
+	fs.StringVar(&cfg.Lang, "lang", DefaultLanguage, "Language code")
+	fs.StringVar(&cfg.Voice, "voice", DefaultVoice, "Voice name")
+
+	if err := fs.Parse(args); err != nil {
+		return cfg, err
+	}
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "voice":
+			cfg.HasVoiceFlag = true
+		case "lang":
+			cfg.HasLangFlag = true
+		}
+	})
+
+	if fs.NArg() > 0 {
+		return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(fs.Args(), " "))
+	}
+	if cfg.Text == "" {
+		return cfg, fmt.Errorf("please provide text using the --text flag")
+	}
+	if cfg.SavePath == "" {
+		return cfg, fmt.Errorf("please provide output path using the --out flag")
+	}
+	return cfg, nil
+}
+
+func parseVoicesCommand(args []string, stderr io.Writer) (Config, error) {
+	cfg := Config{Mode: ModeVoices}
+	fs := flag.NewFlagSet(appName+" voices", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.StringVar(&cfg.Lang, "lang", DefaultLanguage, "Language code")
+
+	if err := fs.Parse(args); err != nil {
+		return cfg, err
+	}
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "lang" {
+			cfg.HasLangFlag = true
+		}
+	})
+
+	if fs.NArg() > 0 {
+		return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(fs.Args(), " "))
+	}
+	cfg.ListVoices = true
+	return cfg, nil
+}
+
+func printHelp(stderr io.Writer) {
+	fmt.Fprintln(stderr, helpTitle)
+	fmt.Fprintln(stderr)
+	fmt.Fprintln(stderr, "Usage:")
+	fmt.Fprintln(stderr, helpUsageSpeak)
+	fmt.Fprintln(stderr, helpUsageSave)
+	fmt.Fprintln(stderr, helpUsageVoices)
+	fmt.Fprintln(stderr, helpUsageSetup)
+	fmt.Fprintln(stderr, helpUsageDoctor)
+	fmt.Fprintln(stderr, helpUsageCompletion)
+	fmt.Fprintln(stderr, helpUsageDefault)
+	fmt.Fprintln(stderr, "  ttscli --version")
+	fmt.Fprintln(stderr)
+	fmt.Fprintln(stderr, "Examples:")
+	fmt.Fprintln(stderr, helpExampleSpeak)
+	fmt.Fprintln(stderr, helpExampleSave)
+	fmt.Fprintln(stderr, helpExampleVoices)
+	fmt.Fprintln(stderr, helpExampleSetup)
+	fmt.Fprintln(stderr, helpExampleDoctor)
+	fmt.Fprintln(stderr, helpExampleCompletion)
+	fmt.Fprintln(stderr, helpExampleDefault)
 }
 
 func parseDefaultCommand(args []string, stderr io.Writer) (Config, error) {

@@ -25,9 +25,9 @@ func Run(args []string, stdout, stderr io.Writer) error {
 	case cli.ModeCompletion:
 		return runCompletionCommand(cfg, stdout)
 	case "":
-		// For backward compatibility in tests that may stub ParseArgs manually.
-		cfg.Mode = cli.ModeRun
-	case cli.ModeRun:
+		// Test compatibility when ParseArgs is stubbed without mode.
+		cfg.Mode = cli.ModeSpeak
+	case cli.ModeSpeak, cli.ModeSave, cli.ModeVoices:
 		// Continue with synth/list flow below.
 	default:
 		return fmt.Errorf("unsupported mode: %s", cfg.Mode)

@@ -23,7 +23,7 @@ func TestRunCompletionBash(t *testing.T) {
 	}
 	out := stdout.String()
 	if !strings.Contains(out, "complete -F _ttscli_completion ttscli") ||
-		!strings.Contains(out, "--list-voices") {
+		!strings.Contains(out, "speak save voices setup") {
 		t.Fatalf("unexpected completion output: %q", out)
 	}
 }

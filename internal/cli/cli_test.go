@@ -7,14 +7,14 @@ import (
 	"testing"
 )
 
-func TestParseCLIArgsListVoices(t *testing.T) {
+func TestParseCLIArgsVoices(t *testing.T) {
 	var stderr bytes.Buffer
-	cfg, err := ParseArgs([]string{"--list-voices", "--lang", "en-GB"}, &stderr)
+	cfg, err := ParseArgs([]string{"voices", "--lang", "en-GB"}, &stderr)
 	if err != nil {
 		t.Fatalf("ParseArgs returned error: %v", err)
 	}
-	if !cfg.ListVoices {
-		t.Fatalf("expected ListVoices=true")
+	if cfg.Mode != ModeVoices || !cfg.ListVoices {
+		t.Fatalf("expected voices mode config, got %+v", cfg)
 	}
 	if cfg.Lang != "en-GB" {
 		t.Fatalf("expected lang en-GB, got %q", cfg.Lang)
@@ -24,9 +24,9 @@ func TestParseCLIArgsListVoices(t *testing.T) {
 	}
 }
 
-func TestParseCLIArgsMissingText(t *testing.T) {
+func TestParseCLIArgsSpeakMissingText(t *testing.T) {
 	var stderr bytes.Buffer
-	_, err := ParseArgs([]string{"--play"}, &stderr)
+	_, err := ParseArgs([]string{"speak"}, &stderr)
 	if err == nil {
 		t.Fatal("expected error for missing text")
 	}
@@ -39,49 +39,83 @@ func TestParseCLIArgsNoArgsHintsHelp(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := ParseArgs([]string{}, &stderr)
 	if err == nil {
-		t.Fatal("expected error for no args")
+		t.Fatal("expected error for no command")
 	}
 	if !strings.Contains(err.Error(), "ttscli --help") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestParseCLIArgsMissingOutputMode(t *testing.T) {
+func TestParseCLIArgsValidSpeak(t *testing.T) {
 	var stderr bytes.Buffer
-	_, err := ParseArgs([]string{"--text", "hello"}, &stderr)
-	if err == nil {
-		t.Fatal("expected error for missing output mode")
-	}
-	if !strings.Contains(err.Error(), "please specify either --save") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestParseCLIArgsValidSynthesize(t *testing.T) {
-	var stderr bytes.Buffer
-	cfg, err := ParseArgs([]string{"--text", "hello", "--save", "out.mp3"}, &stderr)
+	cfg, err := ParseArgs([]string{"speak", "--text", "hello"}, &stderr)
 	if err != nil {
 		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Mode != ModeSpeak {
+		t.Fatalf("expected mode %q, got %+v", ModeSpeak, cfg)
 	}
 	if cfg.Text != "hello" {
 		t.Fatalf("expected text hello, got %q", cfg.Text)
 	}
-	if cfg.SavePath != "out.mp3" {
-		t.Fatalf("expected SavePath out.mp3, got %q", cfg.SavePath)
+	if cfg.SavePath != "" {
+		t.Fatalf("expected empty SavePath for speak, got %q", cfg.SavePath)
+	}
+	if !cfg.Play {
+		t.Fatalf("expected Play=true for speak, got %+v", cfg)
 	}
 	if cfg.Lang != DefaultLanguage || cfg.Voice != DefaultVoice {
 		t.Fatalf("unexpected defaults: lang=%q voice=%q", cfg.Lang, cfg.Voice)
 	}
 }
 
-func TestParseCLIArgsTracksVoiceAndLangFlags(t *testing.T) {
+func TestParseCLIArgsSpeakTracksVoiceAndLangFlags(t *testing.T) {
 	var stderr bytes.Buffer
-	cfg, err := ParseArgs([]string{"--text", "hello", "--save", "out.mp3", "--voice", "en-US-Chirp3-HD-Achernar", "--lang", "en-US"}, &stderr)
+	cfg, err := ParseArgs([]string{"speak", "--text", "hello", "--voice", "en-US-Chirp3-HD-Achernar", "--lang", "en-US"}, &stderr)
 	if err != nil {
 		t.Fatalf("ParseArgs returned error: %v", err)
 	}
 	if !cfg.HasVoiceFlag || !cfg.HasLangFlag {
 		t.Fatalf("expected voice/lang flags to be marked as set, got %+v", cfg)
+	}
+}
+
+func TestParseCLIArgsSaveMissingText(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"save", "--out", "out.mp3"}, &stderr)
+	if err == nil {
+		t.Fatal("expected error for missing text")
+	}
+	if !strings.Contains(err.Error(), "please provide text") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseCLIArgsSaveMissingOut(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"save", "--text", "hello"}, &stderr)
+	if err == nil {
+		t.Fatal("expected error for missing output path")
+	}
+	if !strings.Contains(err.Error(), "--out") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseCLIArgsValidSave(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"save", "--text", "hello", "--out", "out.mp3"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Mode != ModeSave {
+		t.Fatalf("expected mode %q, got %+v", ModeSave, cfg)
+	}
+	if cfg.Text != "hello" || cfg.SavePath != "out.mp3" {
+		t.Fatalf("unexpected save config: %+v", cfg)
+	}
+	if cfg.Play {
+		t.Fatalf("expected Play=false for save, got %+v", cfg)
 	}
 }
 
@@ -95,21 +129,44 @@ func TestParseCLIArgsHelp(t *testing.T) {
 		t.Fatalf("expected flag.ErrHelp, got %v", err)
 	}
 	helpText := stderr.String()
-	if !strings.Contains(helpText, "ttscli setup") ||
-		!strings.Contains(helpText, "ttscli doctor") ||
-		!strings.Contains(helpText, "ttscli completion <bash|zsh|fish>") ||
+	if !strings.Contains(helpText, "ttscli speak --text") ||
+		!strings.Contains(helpText, "ttscli save --text") ||
+		!strings.Contains(helpText, "ttscli voices --lang") ||
+		!strings.Contains(helpText, "ttscli setup") ||
 		!strings.Contains(helpText, "ttscli default <set|get|unset> [flags]") {
-		t.Fatalf("help text missing setup/doctor/completion/default usage, got: %q", helpText)
+		t.Fatalf("help text missing usage examples, got: %q", helpText)
 	}
 }
 
-func TestParseCLIArgsUnexpectedPositionalArgs(t *testing.T) {
+func TestParseCLIArgsSpeakUnexpectedPositionalArgs(t *testing.T) {
 	var stderr bytes.Buffer
-	_, err := ParseArgs([]string{"--text", "hello", "--play", "extra"}, &stderr)
+	_, err := ParseArgs([]string{"speak", "--text", "hello", "extra"}, &stderr)
 	if err == nil {
 		t.Fatal("expected unexpected positional arguments error")
 	}
 	if !strings.Contains(err.Error(), "unexpected positional arguments") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseCLIArgsSpeakRejectsLegacyOutputFlags(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"speak", "--text", "hello", "--play"}, &stderr)
+	if err == nil {
+		t.Fatal("expected unknown flag error for --play")
+	}
+	if !strings.Contains(err.Error(), "flag provided but not defined") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseCLIArgsUnsupportedCommand(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"play"}, &stderr)
+	if err == nil {
+		t.Fatal("expected unsupported command error")
+	}
+	if !strings.Contains(err.Error(), "unsupported command") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

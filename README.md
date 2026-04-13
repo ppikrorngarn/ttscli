@@ -10,7 +10,7 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
 2. **Google Cloud API Key:** You need an API key for the Google Cloud Text-to-Speech API.
    - Go to Google Cloud Console > APIs & Services > Credentials.
    - Create an API Key and restrict it to the "Cloud Text-to-Speech API".
-3. **Audio Player (Linux Only):** If you are running on Linux and want to use the `--play` flag, you need an audio player installed. The CLI looks for `mpg123`, `paplay`, or `ffplay`.
+3. **Audio Player (Linux Only):** If you are running on Linux and want to use the `speak` command (which plays audio), you need an audio player installed. The CLI looks for `mpg123`, `paplay`, or `ffplay`.
    - Ubuntu/Debian: `sudo apt install mpg123`
 4. **Staticcheck (for local quality checks):** Optional but recommended for contributors.
    - Install: `go install honnef.co/go/tools/cmd/staticcheck@v0.7.0`
@@ -79,23 +79,38 @@ If you built locally with `make build`, run `./ttscli ...` from the repo root.
 
 ### Command Reference
 
+- `ttscli speak`: Synthesize text to speech and play it immediately.
+- `ttscli save`: Synthesize text to speech and save MP3 output.
+- `ttscli voices`: List available voices (optionally filter with `--lang`).
 - `ttscli setup`: Interactive first-run setup (API key + defaults + optional sound check).
 - `ttscli doctor`: Health checks (config, API key, API connectivity, playback). Returns non-zero when checks fail.
 - `ttscli completion <bash|zsh|fish>`: Prints shell completion script to stdout.
 - `ttscli default set|get|unset`: Manage saved defaults (`voice`, `lang`, `apiKey`).
 - `ttscli --version`: Print build metadata.
+- `ttscli --help`: Show top-level help.
 
-### Flags Reference
+### `speak` Flags
 
 | Flag | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `--text` | string | `""` | Required for synth mode (not required with `--list-voices` or `--version`). |
-| `--save` | string | `""` | Output MP3 path. |
-| `--play` | bool | `false` | Play synthesized audio immediately. |
-| `--lang` | string | `en-US` | Language code for synth/list (or saved default, if configured). |
+| `--text` | string | `""` | Required for `speak`. |
+| `--lang` | string | `en-US` | Language code for speak (or saved default, if configured). |
 | `--voice` | string | `en-US-Neural2-F` | Voice name for synth (or saved default, if configured). |
-| `--list-voices` | bool | `false` | Lists voices (optionally filtered by `--lang`). |
-| `--version` | bool | `false` | Prints build metadata and exits. |
+
+### `save` Flags
+
+| Flag | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `--text` | string | `""` | Required for `save`. |
+| `--out` | string | `""` | Required output MP3 path. |
+| `--lang` | string | `en-US` | Language code for save (or saved default, if configured). |
+| `--voice` | string | `en-US-Neural2-F` | Voice name for save (or saved default, if configured). |
+
+### `voices` Flags
+
+| Flag | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `--lang` | string | `en-US` | Optional language filter for voice listing. |
 
 ### Basic Commands
 
@@ -121,17 +136,12 @@ ttscli completion zsh
 
 **4. Play audio immediately (without saving):**
 ```bash
-ttscli --text "Hello world, this is a test." --play
+ttscli speak --text "Hello world, this is a test."
 ```
 
 **5. Save audio to a file:**
 ```bash
-ttscli --text "Save this to a file." --save output.mp3
-```
-
-**6. Save and play:**
-```bash
-ttscli --text "Save and play." --save output.mp3 --play
+ttscli save --text "Save this to a file." --out output.mp3
 ```
 
 ### Voice and Language Selection
@@ -140,12 +150,12 @@ By default, the CLI uses a female US English voice (`en-US-Neural2-F`). You can 
 
 **Example: British Male Voice:**
 ```bash
-ttscli --text "Hello there, how are you doing today?" --lang "en-GB" --voice "en-GB-Neural2-B" --play
+ttscli speak --text "Hello there, how are you doing today?" --lang "en-GB" --voice "en-GB-Neural2-B"
 ```
 
 **Example: French Voice:**
 ```bash
-ttscli --text "Bonjour le monde" --lang "fr-FR" --voice "fr-FR-Neural2-A" --play
+ttscli speak --text "Bonjour le monde" --lang "fr-FR" --voice "fr-FR-Neural2-A"
 ```
 
 ### Listing Available Voices
@@ -154,12 +164,12 @@ You can list all available voices for a specific language directly from the API.
 
 **List US English voices (default):**
 ```bash
-ttscli --list-voices
+ttscli voices
 ```
 
 **List voices for another language:**
 ```bash
-ttscli --list-voices --lang en-GB
+ttscli voices --lang en-GB
 ```
 
 ### Persistent Defaults (NVM-like)
@@ -196,8 +206,9 @@ ttscli default unset
 
 ### Behavior Notes
 
-- Synthesize mode requires `--text` and at least one output mode: `--save` or `--play`.
-- `--list-voices` bypasses synth validation and does not require `--text`.
+- `speak` requires `--text` and always plays audio.
+- `save` requires `--text` and `--out`.
+- `voices` does not require `--text`.
 - Press `Ctrl+C` to cancel in-flight API work gracefully.
 - On Linux, playback command priority is: `mpg123`, then `paplay`, then `ffplay`.
 - Config lookup priority:
@@ -211,7 +222,7 @@ ttscli default unset
 
 ## Help
 
-For a full list of flags, use the `--help` command:
+For a full list of commands and flags, use:
 ```bash
 ttscli --help
 ```
@@ -261,7 +272,7 @@ ttscli completion fish > ~/.config/fish/completions/ttscli.fish
 - `dial tcp: lookup texttospeech.googleapis.com: no such host`:
   this is a DNS/network issue in your environment; verify internet/DNS and retry.
 - `voice "..." is not available for language "..."` when running `default set`:
-  use `--list-voices --lang <lang>` to find valid voice names.
+  use `ttscli voices --lang <lang>` to find valid voice names.
 
 ## Project Structure
 
@@ -278,7 +289,7 @@ A `Makefile` is included to simplify common development tasks.
 
 - `make build` - Compiles the Go binary into `ttscli` with version metadata (`VERSION`, `COMMIT`, `DATE`).
 - `make clean` - Removes the compiled binary and any generated `.mp3` files in the directory.
-- `make run ARGS="..."` - Builds and runs the CLI, passing arguments to it (e.g., `make run ARGS="--list-voices"`).
+- `make run ARGS="..."` - Builds and runs the CLI, passing arguments to it (e.g., `make run ARGS="voices --lang en-GB"`).
 - `make test` - Runs Go tests.
 - `make test-race` - Runs tests with the race detector.
 - `make tools` - Installs pinned local developer tools (currently `staticcheck`).
