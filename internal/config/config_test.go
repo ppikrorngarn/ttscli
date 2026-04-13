@@ -15,6 +15,61 @@ func TestPath(t *testing.T) {
 	userConfigDir = func() (string, error) {
 		return "/tmp/usercfg", nil
 	}
+	fileExists = func(path string) (bool, error) { return false, nil }
+
+	got, err := Path()
+	if err != nil {
+		t.Fatalf("Path returned error: %v", err)
+	}
+	want := filepath.Join("/tmp/usercfg", appDirName, configName)
+	if got != want {
+		t.Fatalf("unexpected path: got=%q want=%q", got, want)
+	}
+}
+
+func TestPathPrefersLocalConfigNextToBinaryWhenExists(t *testing.T) {
+	reset := stubConfigDeps()
+	defer reset()
+
+	executablePath = func() (string, error) {
+		return "/opt/ttscli/ttscli", nil
+	}
+	fileExists = func(path string) (bool, error) {
+		if path != filepath.Join("/opt/ttscli", configName) {
+			t.Fatalf("unexpected local path check: %q", path)
+		}
+		return true, nil
+	}
+	userConfigDir = func() (string, error) {
+		return "/tmp/usercfg", nil
+	}
+
+	got, err := Path()
+	if err != nil {
+		t.Fatalf("Path returned error: %v", err)
+	}
+	want := filepath.Join("/opt/ttscli", configName)
+	if got != want {
+		t.Fatalf("unexpected path: got=%q want=%q", got, want)
+	}
+}
+
+func TestPathFallsBackToUserPathWhenLocalConfigMissing(t *testing.T) {
+	reset := stubConfigDeps()
+	defer reset()
+
+	executablePath = func() (string, error) {
+		return "/opt/ttscli/ttscli", nil
+	}
+	fileExists = func(path string) (bool, error) {
+		if path != filepath.Join("/opt/ttscli", configName) {
+			t.Fatalf("unexpected local path check: %q", path)
+		}
+		return false, nil
+	}
+	userConfigDir = func() (string, error) {
+		return "/tmp/usercfg", nil
+	}
 
 	got, err := Path()
 	if err != nil {
@@ -127,6 +182,8 @@ func TestClearDefaultsError(t *testing.T) {
 
 func stubConfigDeps() func() {
 	oldUserConfigDir := userConfigDir
+	oldExecutablePath := executablePath
+	oldFileExists := fileExists
 	oldReadFile := readFile
 	oldWriteFile := writeFile
 	oldMkdirAll := mkdirAll
@@ -135,6 +192,10 @@ func stubConfigDeps() func() {
 	userConfigDir = func() (string, error) {
 		return "/tmp/usercfg", nil
 	}
+	executablePath = func() (string, error) {
+		return "/tmp/bin/ttscli", nil
+	}
+	fileExists = func(path string) (bool, error) { return false, nil }
 	readFile = func(string) ([]byte, error) {
 		return []byte(`{"voice":"en-US-Neural2-F","lang":"en-US","apiKey":"k-old"}`), nil
 	}
@@ -144,6 +205,8 @@ func stubConfigDeps() func() {
 
 	return func() {
 		userConfigDir = oldUserConfigDir
+		executablePath = oldExecutablePath
+		fileExists = oldFileExists
 		readFile = oldReadFile
 		writeFile = oldWriteFile
 		mkdirAll = oldMkdirAll

@@ -200,6 +200,8 @@ ttscli default unset
 - `--list-voices` bypasses synth validation and does not require `--text`.
 - Press `Ctrl+C` to cancel in-flight API work gracefully.
 - On Linux, playback command priority is: `mpg123`, then `paplay`, then `ffplay`.
+- Config lookup priority:
+  if `config.json` exists next to the `ttscli` binary, it is used first; otherwise use the user config path (for example on macOS: `~/Library/Application Support/ttscli/config.json`).
 - Priority for synth/list language and voice:
   explicit flags (`--voice`, `--lang`) > saved defaults (`ttscli default ...`) > built-in defaults.
 - Priority for API key:

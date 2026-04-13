@@ -21,14 +21,48 @@ type Defaults struct {
 }
 
 var (
-	userConfigDir = os.UserConfigDir
-	readFile      = os.ReadFile
-	writeFile     = os.WriteFile
-	mkdirAll      = os.MkdirAll
-	removeFile    = os.Remove
+	userConfigDir  = os.UserConfigDir
+	executablePath = os.Executable
+	fileExists     = func(path string) (bool, error) {
+		_, err := os.Stat(path)
+		if err == nil {
+			return true, nil
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
+	}
+	readFile   = os.ReadFile
+	writeFile  = os.WriteFile
+	mkdirAll   = os.MkdirAll
+	removeFile = os.Remove
 )
 
 func Path() (string, error) {
+	localPath, err := localPath()
+	if err == nil {
+		exists, err := fileExists(localPath)
+		if err != nil {
+			return "", fmt.Errorf("check local config file: %w", err)
+		}
+		if exists {
+			return localPath, nil
+		}
+	}
+
+	return userPath()
+}
+
+func localPath() (string, error) {
+	exePath, err := executablePath()
+	if err != nil {
+		return "", fmt.Errorf("resolve executable path: %w", err)
+	}
+	return filepath.Join(filepath.Dir(exePath), configName), nil
+}
+
+func userPath() (string, error) {
 	baseDir, err := userConfigDir()
 	if err != nil {
 		return "", fmt.Errorf("resolve user config dir: %w", err)
