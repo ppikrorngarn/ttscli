@@ -47,7 +47,7 @@ func TestParseCLIArgsSpeakMissingText(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing text")
 	}
-	if !strings.Contains(err.Error(), "please provide text") {
+	if !strings.Contains(err.Error(), "--text or -t") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -126,7 +126,7 @@ func TestParseCLIArgsSaveMissingText(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing text")
 	}
-	if !strings.Contains(err.Error(), "please provide text") {
+	if !strings.Contains(err.Error(), "--text or -t") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -137,7 +137,7 @@ func TestParseCLIArgsSaveMissingOut(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing output path")
 	}
-	if !strings.Contains(err.Error(), "--out") {
+	if !strings.Contains(err.Error(), "--out or -o") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -196,8 +196,27 @@ func TestParseCLIArgsHelp(t *testing.T) {
 		!strings.Contains(helpText, "ttscli save --text") ||
 		!strings.Contains(helpText, "ttscli voices --lang") ||
 		!strings.Contains(helpText, "ttscli setup") ||
-		!strings.Contains(helpText, "ttscli default <set|get|unset> [flags]") {
+		!strings.Contains(helpText, "ttscli default <set|get|unset> [flags]") ||
+		!strings.Contains(helpText, "Short aliases: -t/--text, -o/--out, -l/--lang, -v/--voice, -k/--api-key") {
 		t.Fatalf("help text missing usage examples, got: %q", helpText)
+	}
+}
+
+func TestParseCLIArgsSpeakHelpShowsShorthandFlags(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"speak", "--help"}, &stderr)
+	if err == nil {
+		t.Fatal("expected help error")
+	}
+	if err != flag.ErrHelp {
+		t.Fatalf("expected flag.ErrHelp, got %v", err)
+	}
+	helpText := stderr.String()
+	if !strings.Contains(helpText, "-t string") ||
+		!strings.Contains(helpText, "-text string") ||
+		!strings.Contains(helpText, "-v string") ||
+		!strings.Contains(helpText, "-voice string") {
+		t.Fatalf("speak help text missing shorthand flags, got: %q", helpText)
 	}
 }
 
@@ -279,7 +298,7 @@ func TestParseCLIArgsDefaultSetRequiresAtLeastOneFlag(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when no default set flags are provided")
 	}
-	if !strings.Contains(err.Error(), "please provide --voice, --lang, and/or --api-key") {
+	if !strings.Contains(err.Error(), "--voice/-v, --lang/-l, and/or --api-key/-k") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

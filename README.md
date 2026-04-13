@@ -244,6 +244,13 @@ For a full list of commands and flags, use:
 ```bash
 ttscli --help
 ```
+For command-specific flags, use:
+```bash
+ttscli speak --help
+ttscli save --help
+ttscli default set --help
+```
+Short aliases are available for the most common flags, such as `-t`, `-o`, `-l`, `-v`, and `-k`.
 If you run `ttscli` with no arguments, it will print a hint to run `--help`.
 
 ## Shell Completion

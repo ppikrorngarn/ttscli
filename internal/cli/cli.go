@@ -26,6 +26,7 @@ const (
 	helpExampleDoctor     = "  ttscli doctor"
 	helpExampleCompletion = "  ttscli completion zsh"
 	helpExampleDefault    = "  ttscli default set --voice en-US-Chirp3-HD-Achernar --lang en-US"
+	helpAliases           = "Short aliases: -t/--text, -o/--out, -l/--lang, -v/--voice, -k/--api-key"
 	ModeSpeak             = "speak"
 	ModeSave              = "save"
 	ModeVoices            = "voices"
@@ -148,7 +149,7 @@ func parseSpeakCommand(args []string, stderr io.Writer) (Config, error) {
 		return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(fs.Args(), " "))
 	}
 	if cfg.Text == "" {
-		return cfg, fmt.Errorf("please provide text using the --text flag")
+		return cfg, fmt.Errorf("please provide text using --text or -t")
 	}
 	cfg.Play = true
 	return cfg, nil
@@ -184,10 +185,10 @@ func parseSaveCommand(args []string, stderr io.Writer) (Config, error) {
 		return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(fs.Args(), " "))
 	}
 	if cfg.Text == "" {
-		return cfg, fmt.Errorf("please provide text using the --text flag")
+		return cfg, fmt.Errorf("please provide text using --text or -t")
 	}
 	if cfg.SavePath == "" {
-		return cfg, fmt.Errorf("please provide output path using the --out flag")
+		return cfg, fmt.Errorf("please provide output path using --out or -o")
 	}
 	return cfg, nil
 }
@@ -227,6 +228,8 @@ func printHelp(stderr io.Writer) {
 	fmt.Fprintln(stderr, helpUsageCompletion)
 	fmt.Fprintln(stderr, helpUsageDefault)
 	fmt.Fprintln(stderr, "  ttscli --version")
+	fmt.Fprintln(stderr)
+	fmt.Fprintln(stderr, helpAliases)
 	fmt.Fprintln(stderr)
 	fmt.Fprintln(stderr, "Examples:")
 	fmt.Fprintln(stderr, helpExampleSpeak)
@@ -277,7 +280,7 @@ func parseDefaultCommand(args []string, stderr io.Writer) (Config, error) {
 			return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(fs.Args(), " "))
 		}
 		if !cfg.HasVoiceFlag && !cfg.HasLangFlag && !cfg.HasAPIKeyFlag {
-			return cfg, fmt.Errorf("please provide --voice, --lang, and/or --api-key")
+			return cfg, fmt.Errorf("please provide --voice/-v, --lang/-l, and/or --api-key/-k")
 		}
 		return cfg, nil
 	case DefaultUnset:
