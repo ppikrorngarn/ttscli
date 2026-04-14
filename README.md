@@ -21,7 +21,40 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
    ```bash
    go install github.com/ppikrorngarn/ttscli/cmd/ttscli@latest
    ```
-   Make sure `$(go env GOPATH)/bin` is in your `PATH`.
+   This installs the `ttscli` binary into your Go bin directory.
+   If `GOBIN` is set, Go installs there. Otherwise it uses:
+   ```bash
+   $(go env GOPATH)/bin
+   ```
+
+   You can inspect `GOBIN` with:
+   ```bash
+   $(go env GOBIN)
+   ```
+
+   Make sure that directory is in your `PATH`.
+
+   Use the same Go bin directory in your `PATH`.
+   If `GOBIN` is empty, that usually means `$(go env GOPATH)/bin`.
+
+   Temporary shell setup for the current session:
+   ```bash
+   export PATH="<go-bin-dir>:$PATH"
+   ```
+
+   To make that permanent on macOS/Linux, add the same line to your shell profile such as `~/.zshrc`, `~/.bashrc`, or `~/.profile`.
+
+   Temporary PowerShell example for the current session:
+   ```powershell
+   $env:Path += ";<go-bin-dir>"
+   ```
+
+   To make that permanent on Windows, add the directory to your user `Path` environment variable in System Settings, or persist it in your PowerShell profile.
+
+   Then verify the install:
+   ```bash
+   ttscli --version
+   ```
 
 2. **Or clone the repository and build the binary locally:**
    You can use the provided Makefile to build the project easily:
@@ -29,6 +62,31 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
    make build
    ```
    *(Or run `go build -o ttscli ./cmd/ttscli` directly).*
+
+   If you want to install that locally built binary into your personal bin directory:
+   ```bash
+   mkdir -p ~/.local/bin
+   install -m 0755 ttscli ~/.local/bin/ttscli
+   export PATH="$HOME/.local/bin:$PATH"
+   ```
+
+   The `export PATH=...` line only affects the current shell session.
+   To make it permanent on macOS/Linux, add it to your shell profile such as `~/.zshrc`, `~/.bashrc`, or `~/.profile`.
+
+   Windows PowerShell example:
+   ```powershell
+   New-Item -ItemType Directory -Force "$HOME\bin" | Out-Null
+   Copy-Item .\ttscli.exe "$HOME\bin\ttscli.exe"
+   $env:Path += ";" + "$HOME\bin"
+   ```
+
+   The `$env:Path += ...` line only affects the current PowerShell session.
+   To make it permanent on Windows, add `%USERPROFILE%\bin` to your user `Path` environment variable in System Settings, or persist it in your PowerShell profile.
+
+   Then verify it:
+   ```bash
+   ttscli --version
+   ```
 
 3. **Run first-time setup (recommended):**
    ```bash
@@ -47,15 +105,24 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
    export TTSCLI_GOOGLE_API_KEY="your_api_key_here"
    ```
 
+   To make that persistent on macOS/Linux, add it to your shell profile.
+   On Windows, set it as a user environment variable instead of relying on a session-only shell command.
+
 ### Contributor Setup
 
 For local quality checks:
 
 ```bash
 make tools
-export PATH="$(go env GOPATH)/bin:$PATH"
+export PATH="<go-bin-dir>:$PATH"
 make check
 ```
+
+Use the same Go bin directory that `go install` writes to.
+If `GOBIN` is empty, that usually means `$(go env GOPATH)/bin`.
+
+The `export PATH=...` line above only affects the current shell session.
+If you use these tools often, add the same line to your shell profile.
 
 For contribution and licensing details, see:
 - [CONTRIBUTING.md](./CONTRIBUTING.md)
@@ -76,6 +143,8 @@ make check
 
 If you installed via `go install`, run `ttscli ...` from your shell `PATH`.
 If you built locally with `make build`, run `./ttscli ...` from the repo root.
+If you manually copied the binary into a personal bin directory such as `~/.local/bin`, run `ttscli ...` after adding that directory to your `PATH`.
+On Windows, the equivalent is typically `ttscli.exe` from a directory such as `%USERPROFILE%\bin` after adding it to `Path`.
 
 ### Command Reference
 
@@ -230,7 +299,11 @@ ttscli default unset
 - Press `Ctrl+C` to cancel in-flight API work gracefully.
 - On Linux, playback command priority is: `mpg123`, then `paplay`, then `ffplay`.
 - Config lookup priority:
-  if `config.json` exists next to the `ttscli` binary, it is used first; otherwise use the user config path (for example on macOS: `~/Library/Application Support/ttscli/config.json`).
+  if `config.json` exists next to the `ttscli` binary, it is used first; otherwise use the user config path.
+  Examples:
+  macOS: `~/Library/Application Support/ttscli/config.json`
+  Linux: `~/.config/ttscli/config.json`
+  Windows: `%AppData%\ttscli\config.json`
 - Priority for synth/list language and voice:
   explicit flags (`--voice`, `--lang`) > saved defaults (`ttscli default ...`) > built-in defaults.
 - Priority for API key:
@@ -266,9 +339,9 @@ ttscli completion fish
 Install examples:
 
 ```bash
-# bash (Linux)
+# bash (Linux, system-wide example; may require sudo and varies by distro)
 ttscli completion bash > /etc/bash_completion.d/ttscli
-source /etc/bash_completion
+# start a new shell, or source your distro's bash-completion setup if available
 ```
 
 ```bash
@@ -288,8 +361,11 @@ ttscli completion fish > ~/.config/fish/completions/ttscli.fish
 
 ## Troubleshooting
 
-- `TTSCLI_GOOGLE_API_KEY environment variable is not set`:
-  set `TTSCLI_GOOGLE_API_KEY` in your shell, or save it with `ttscli default set --api-key ...`.
+- `ttscli: command not found`:
+  make sure the binary directory is on your `PATH`.
+  Common locations are `$(go env GOPATH)/bin`, `$(go env GOBIN)`, `~/.local/bin`, or `%USERPROFILE%\bin`.
+- missing API key errors:
+  save a key with `ttscli default set --api-key ...`, run `ttscli setup`, or set `TTSCLI_GOOGLE_API_KEY` in your environment.
 - `no supported audio player found on Linux`:
   install one of `mpg123`, `paplay`, or `ffplay`.
 - `failed to synthesize: status=... body=...`:
