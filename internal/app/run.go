@@ -43,8 +43,6 @@ func Run(args []string, stdout, stderr io.Writer) error {
 	var profileKey string
 	if cfg.Profile != "" {
 		profileKey = cfg.Profile
-	} else if envProfile := lookupEnv("TTSCLI_PROFILE"); envProfile != "" {
-		profileKey = envProfile
 	} else {
 		// Use active profile from config
 		if appCfg.ActiveProvider == "" || appCfg.ActiveProfile == "" {

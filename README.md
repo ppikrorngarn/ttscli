@@ -170,7 +170,7 @@ On Windows, the equivalent is typically `ttscli.exe` from a directory such as `%
 **Profile Key Format**: `{provider}:{name}` (e.g., `gcp:default`, `aws:work`)
 
 **Profile Resolution**:
-1. `--profile` flag or `TTSCLI_PROFILE` environment variable
+1. `--profile` flag
 2. Active profile from config
 3. First available profile
 4. Error if no profiles exist
@@ -219,11 +219,6 @@ On Windows, the equivalent is typically `ttscli.exe` from a directory such as `%
 
 Prefer managing profiles via the `ttscli profile` subcommands (see [Command Reference](#command-reference)) rather than editing this file by hand.
 
-### Environment Variables
-
-| Variable         | Description                                                                                                                      |
-|------------------|----------------------------------------------------------------------------------------------------------------------------------|
-| `TTSCLI_PROFILE` | Overrides the active profile (e.g. `gcp:work`). Evaluated after `--profile` but before the active profile stored in the config. |
 
 ### Command Reference
 

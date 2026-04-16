@@ -66,25 +66,6 @@ func TestRunProfileFlag(t *testing.T) {
 	}
 }
 
-func TestRunEnvVarProfile(t *testing.T) {
-	reset := stubAppDeps()
-	defer reset()
-
-	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
-		return cli.Config{Mode: cli.ModeVoices, ListVoices: true, Lang: "en-US"}, nil
-	}
-	lookupEnv = func(key string) string {
-		if key == "TTSCLI_PROFILE" {
-			return "gcp:default"
-		}
-		return ""
-	}
-
-	if err := Run([]string{"voices"}, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
-		t.Fatalf("Run returned error: %v", err)
-	}
-}
-
 func TestRunNoActiveProfile(t *testing.T) {
 	reset := stubAppDeps()
 	defer reset()
