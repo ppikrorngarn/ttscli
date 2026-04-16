@@ -196,8 +196,8 @@ func TestParseCLIArgsHelp(t *testing.T) {
 		!strings.Contains(helpText, "ttscli save --text") ||
 		!strings.Contains(helpText, "ttscli voices --lang") ||
 		!strings.Contains(helpText, "ttscli setup") ||
-		!strings.Contains(helpText, "ttscli default <set|get|unset> [flags]") ||
-		!strings.Contains(helpText, "Short aliases: -t/--text, -o/--out, -l/--lang, -v/--voice, -k/--api-key") {
+		!strings.Contains(helpText, "ttscli profile <list|create|delete|use|get> [flags]") ||
+		!strings.Contains(helpText, "Short aliases: -t/--text, -o/--out, -l/--lang, -v/--voice, -p/--profile") {
 		t.Fatalf("help text missing usage examples, got: %q", helpText)
 	}
 }
@@ -250,120 +250,6 @@ func TestParseCLIArgsUnsupportedCommand(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unsupported command") {
 		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestParseCLIArgsDefaultSetVoiceOnly(t *testing.T) {
-	var stderr bytes.Buffer
-	cfg, err := ParseArgs([]string{"default", "set", "--voice", "en-US-Chirp3-HD-Achernar"}, &stderr)
-	if err != nil {
-		t.Fatalf("ParseArgs returned error: %v", err)
-	}
-	if cfg.Mode != "default" || cfg.DefaultSubcommand != "set" {
-		t.Fatalf("unexpected default command config: %+v", cfg)
-	}
-	if !cfg.HasVoiceFlag || cfg.HasLangFlag {
-		t.Fatalf("expected voice-only flags, got %+v", cfg)
-	}
-}
-
-func TestParseCLIArgsDefaultSetAPIKeyOnly(t *testing.T) {
-	var stderr bytes.Buffer
-	cfg, err := ParseArgs([]string{"default", "set", "--api-key", "k-12345"}, &stderr)
-	if err != nil {
-		t.Fatalf("ParseArgs returned error: %v", err)
-	}
-	if !cfg.HasAPIKeyFlag || cfg.APIKey != "k-12345" {
-		t.Fatalf("expected api key flag/value to be parsed, got %+v", cfg)
-	}
-}
-
-func TestParseCLIArgsDefaultSetShorthandFlags(t *testing.T) {
-	var stderr bytes.Buffer
-	cfg, err := ParseArgs([]string{"default", "set", "-v", "en-US-Chirp3-HD-Achernar", "-l", "en-US", "-k", "k-12345"}, &stderr)
-	if err != nil {
-		t.Fatalf("ParseArgs returned error: %v", err)
-	}
-	if !cfg.HasVoiceFlag || !cfg.HasLangFlag || !cfg.HasAPIKeyFlag {
-		t.Fatalf("expected shorthand flags to be marked as set, got %+v", cfg)
-	}
-	if cfg.Voice != "en-US-Chirp3-HD-Achernar" || cfg.Lang != "en-US" || cfg.APIKey != "k-12345" {
-		t.Fatalf("unexpected shorthand default set values: %+v", cfg)
-	}
-}
-
-func TestParseCLIArgsDefaultSetRequiresAtLeastOneFlag(t *testing.T) {
-	var stderr bytes.Buffer
-	_, err := ParseArgs([]string{"default", "set"}, &stderr)
-	if err == nil {
-		t.Fatal("expected error when no default set flags are provided")
-	}
-	if !strings.Contains(err.Error(), "--voice/-v, --lang/-l, and/or --api-key/-k") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestParseCLIArgsDefaultGetAndUnset(t *testing.T) {
-	var stderr bytes.Buffer
-
-	getCfg, err := ParseArgs([]string{"default", "get"}, &stderr)
-	if err != nil {
-		t.Fatalf("ParseArgs(default get) returned error: %v", err)
-	}
-	if getCfg.DefaultSubcommand != "get" {
-		t.Fatalf("expected get subcommand, got %+v", getCfg)
-	}
-
-	unsetCfg, err := ParseArgs([]string{"default", "unset"}, &stderr)
-	if err != nil {
-		t.Fatalf("ParseArgs(default unset) returned error: %v", err)
-	}
-	if unsetCfg.DefaultSubcommand != "unset" {
-		t.Fatalf("expected unset subcommand, got %+v", unsetCfg)
-	}
-}
-
-func TestParseCLIArgsDefaultUnknownSubcommand(t *testing.T) {
-	var stderr bytes.Buffer
-	_, err := ParseArgs([]string{"default", "whoami"}, &stderr)
-	if err == nil {
-		t.Fatal("expected error for unknown default subcommand")
-	}
-	if !strings.Contains(err.Error(), "unsupported default subcommand") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestParseCLIArgsDefaultUnsetSelectors(t *testing.T) {
-	var stderr bytes.Buffer
-	cfg, err := ParseArgs([]string{"default", "unset", "--voice", "--api-key"}, &stderr)
-	if err != nil {
-		t.Fatalf("ParseArgs returned error: %v", err)
-	}
-	if !cfg.HasVoiceFlag || !cfg.HasAPIKeyFlag || cfg.HasLangFlag {
-		t.Fatalf("unexpected unset selectors: %+v", cfg)
-	}
-}
-
-func TestParseCLIArgsDefaultUnsetShorthandSelectors(t *testing.T) {
-	var stderr bytes.Buffer
-	cfg, err := ParseArgs([]string{"default", "unset", "-v", "-k"}, &stderr)
-	if err != nil {
-		t.Fatalf("ParseArgs returned error: %v", err)
-	}
-	if !cfg.HasVoiceFlag || !cfg.HasAPIKeyFlag || cfg.HasLangFlag {
-		t.Fatalf("unexpected shorthand unset selectors: %+v", cfg)
-	}
-}
-
-func TestParseCLIArgsSetup(t *testing.T) {
-	var stderr bytes.Buffer
-	cfg, err := ParseArgs([]string{"setup"}, &stderr)
-	if err != nil {
-		t.Fatalf("ParseArgs returned error: %v", err)
-	}
-	if cfg.Mode != ModeSetup {
-		t.Fatalf("expected mode %q, got %+v", ModeSetup, cfg)
 	}
 }
 

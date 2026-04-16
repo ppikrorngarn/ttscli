@@ -18,7 +18,6 @@ const (
 	helpUsageSetup        = "  ttscli setup"
 	helpUsageDoctor       = "  ttscli doctor"
 	helpUsageCompletion   = "  ttscli completion <bash|zsh|fish>"
-	helpUsageDefault      = "  ttscli default <set|get|unset> [flags]"
 	helpUsageProfile      = "  ttscli profile <list|create|delete|use|get> [flags]"
 	helpExampleSpeak      = `  ttscli speak --text "Hello world"`
 	helpExampleSave       = `  ttscli save --text "Hello world" --out output.mp3"`
@@ -26,20 +25,15 @@ const (
 	helpExampleSetup      = "  ttscli setup"
 	helpExampleDoctor     = "  ttscli doctor"
 	helpExampleCompletion = "  ttscli completion zsh"
-	helpExampleDefault    = "  ttscli default set --voice en-US-Chirp3-HD-Achernar --lang en-US"
 	helpExampleProfile    = "  ttscli profile create --provider gcp --name default --api-key YOUR_KEY"
-	helpAliases           = "Short aliases: -t/--text, -o/--out, -l/--lang, -v/--voice, -k/--api-key, -p/--profile"
+	helpAliases           = "Short aliases: -t/--text, -o/--out, -l/--lang, -v/--voice, -p/--profile"
 	ModeSpeak             = "speak"
 	ModeSave              = "save"
 	ModeVoices            = "voices"
-	ModeDefault           = "default"
 	ModeSetup             = "setup"
 	ModeDoctor            = "doctor"
 	ModeCompletion        = "completion"
 	ModeProfile           = "profile"
-	DefaultSet            = "set"
-	DefaultGet            = "get"
-	DefaultUnset          = "unset"
 	ProfileList           = "list"
 	ProfileCreate         = "create"
 	ProfileDelete         = "delete"
@@ -89,9 +83,6 @@ func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 	if len(args) > 0 && args[0] == ModeVoices {
 		return parseVoicesCommand(args[1:], stderr)
 	}
-	if len(args) > 0 && args[0] == ModeDefault {
-		return parseDefaultCommand(args[1:], stderr)
-	}
 	if len(args) > 0 && args[0] == ModeSetup {
 		cfg := Config{Mode: ModeSetup}
 		if len(args) > 1 {
@@ -113,7 +104,7 @@ func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 		return parseProfileCommand(args[1:], stderr)
 	}
 
-	return Config{}, fmt.Errorf("unsupported command %q (use: speak, save, voices, setup, doctor, completion, default, profile)", args[0])
+	return Config{}, fmt.Errorf("unsupported command %q (use: speak, save, voices, setup, doctor, completion, profile)", args[0])
 }
 
 func parseCompletionCommand(args []string) (Config, error) {
@@ -244,7 +235,6 @@ func printHelp(stderr io.Writer) {
 	fmt.Fprintln(stderr, helpUsageSetup)
 	fmt.Fprintln(stderr, helpUsageDoctor)
 	fmt.Fprintln(stderr, helpUsageCompletion)
-	fmt.Fprintln(stderr, helpUsageDefault)
 	fmt.Fprintln(stderr, helpUsageProfile)
 	fmt.Fprintln(stderr, "  ttscli --version")
 	fmt.Fprintln(stderr)
@@ -257,71 +247,7 @@ func printHelp(stderr io.Writer) {
 	fmt.Fprintln(stderr, helpExampleSetup)
 	fmt.Fprintln(stderr, helpExampleDoctor)
 	fmt.Fprintln(stderr, helpExampleCompletion)
-	fmt.Fprintln(stderr, helpExampleDefault)
 	fmt.Fprintln(stderr, helpExampleProfile)
-}
-
-func parseDefaultCommand(args []string, stderr io.Writer) (Config, error) {
-	cfg := Config{Mode: ModeDefault}
-	if len(args) == 0 {
-		return cfg, fmt.Errorf("please provide a default subcommand: set, get, or unset")
-	}
-
-	cfg.DefaultSubcommand = args[0]
-	switch cfg.DefaultSubcommand {
-	case DefaultGet:
-		if len(args) > 1 {
-			return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(args[1:], " "))
-		}
-		return cfg, nil
-	case DefaultSet:
-		fs := flag.NewFlagSet(appName+" default set", flag.ContinueOnError)
-		fs.SetOutput(stderr)
-		fs.StringVar(&cfg.Voice, "voice", "", "Default voice name")
-		fs.StringVar(&cfg.Voice, "v", "", "Default voice name (shorthand)")
-		fs.StringVar(&cfg.Lang, "lang", "", "Default language code")
-		fs.StringVar(&cfg.Lang, "l", "", "Default language code (shorthand)")
-		fs.StringVar(&cfg.APIKey, "api-key", "", "Default Google Cloud Text-to-Speech API key")
-		fs.StringVar(&cfg.APIKey, "k", "", "Default Google Cloud Text-to-Speech API key (shorthand)")
-		if err := fs.Parse(args[1:]); err != nil {
-			return cfg, err
-		}
-		fs.Visit(func(f *flag.Flag) {
-			switch f.Name {
-			case "voice", "v":
-				cfg.HasVoiceFlag = true
-			case "lang", "l":
-				cfg.HasLangFlag = true
-			case "api-key", "k":
-				cfg.HasAPIKeyFlag = true
-			}
-		})
-		if fs.NArg() > 0 {
-			return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(fs.Args(), " "))
-		}
-		if !cfg.HasVoiceFlag && !cfg.HasLangFlag && !cfg.HasAPIKeyFlag {
-			return cfg, fmt.Errorf("please provide --voice/-v, --lang/-l, and/or --api-key/-k")
-		}
-		return cfg, nil
-	case DefaultUnset:
-		fs := flag.NewFlagSet(appName+" default unset", flag.ContinueOnError)
-		fs.SetOutput(stderr)
-		fs.BoolVar(&cfg.HasVoiceFlag, "voice", false, "Unset saved default voice")
-		fs.BoolVar(&cfg.HasVoiceFlag, "v", false, "Unset saved default voice (shorthand)")
-		fs.BoolVar(&cfg.HasLangFlag, "lang", false, "Unset saved default language")
-		fs.BoolVar(&cfg.HasLangFlag, "l", false, "Unset saved default language (shorthand)")
-		fs.BoolVar(&cfg.HasAPIKeyFlag, "api-key", false, "Unset saved API key")
-		fs.BoolVar(&cfg.HasAPIKeyFlag, "k", false, "Unset saved API key (shorthand)")
-		if err := fs.Parse(args[1:]); err != nil {
-			return cfg, err
-		}
-		if fs.NArg() > 0 {
-			return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(fs.Args(), " "))
-		}
-		return cfg, nil
-	default:
-		return cfg, fmt.Errorf("unsupported default subcommand %q (use: set, get, unset)", cfg.DefaultSubcommand)
-	}
 }
 
 func parseProfileCommand(args []string, stderr io.Writer) (Config, error) {

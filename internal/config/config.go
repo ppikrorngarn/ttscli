@@ -14,12 +14,6 @@ const (
 	dirPermission = 0o755
 )
 
-type Defaults struct {
-	Voice  string `json:"voice,omitempty"`
-	Lang   string `json:"lang,omitempty"`
-	APIKey string `json:"apiKey,omitempty"`
-}
-
 type Profile struct {
 	Provider    string                 `json:"provider"`
 	Name        string                 `json:"name"`
@@ -83,57 +77,6 @@ func userPath() (string, error) {
 	return filepath.Join(baseDir, appDirName, configName), nil
 }
 
-func LoadDefaults() (Defaults, error) {
-	path, err := Path()
-	if err != nil {
-		return Defaults{}, err
-	}
-	raw, err := readFile(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return Defaults{}, nil
-		}
-		return Defaults{}, fmt.Errorf("read config file: %w", err)
-	}
-
-	var defaults Defaults
-	if err := json.Unmarshal(raw, &defaults); err != nil {
-		return Defaults{}, fmt.Errorf("parse config file: %w", err)
-	}
-	return defaults, nil
-}
-
-func SaveDefaults(defaults Defaults) error {
-	path, err := Path()
-	if err != nil {
-		return err
-	}
-	if err := mkdirAll(filepath.Dir(path), dirPermission); err != nil {
-		return fmt.Errorf("create config dir: %w", err)
-	}
-
-	raw, err := json.MarshalIndent(defaults, "", "  ")
-	if err != nil {
-		return fmt.Errorf("encode config file: %w", err)
-	}
-	raw = append(raw, '\n')
-	if err := writeFile(path, raw, 0o644); err != nil {
-		return fmt.Errorf("write config file: %w", err)
-	}
-	return nil
-}
-
-func ClearDefaults() error {
-	path, err := Path()
-	if err != nil {
-		return err
-	}
-	if err := removeFile(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("remove config file: %w", err)
-	}
-	return nil
-}
-
 func LoadConfig() (Config, error) {
 	path, err := Path()
 	if err != nil {
@@ -183,18 +126,4 @@ func GetProfile(cfg Config, profileKey string) (Profile, error) {
 		return Profile{}, fmt.Errorf("profile %q not found", profileKey)
 	}
 	return profile, nil
-}
-
-func SetProfile(cfg Config, profile Profile) error {
-	profileKey := profile.Provider + ":" + profile.Name
-	cfg.Profiles[profileKey] = profile
-	return SaveConfig(cfg)
-}
-
-func DeleteProfile(cfg Config, profileKey string) error {
-	if _, ok := cfg.Profiles[profileKey]; !ok {
-		return fmt.Errorf("profile %q not found", profileKey)
-	}
-	delete(cfg.Profiles, profileKey)
-	return SaveConfig(cfg)
 }
