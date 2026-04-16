@@ -1,15 +1,15 @@
-# GCP Text-to-Speech CLI (`ttscli`)
+# Multi-Provider Text-to-Speech CLI (`ttscli`)
 
-A lightweight, fast Command Line Interface (CLI) written in Go to convert text into speech using the Google Cloud Text-to-Speech API. 
+A lightweight, fast Command Line Interface (CLI) written in Go to convert text into speech using multiple cloud TTS providers. Currently supports Google Cloud, with planned support for AWS, Azure, IBM Cloud, and Alibaba Cloud.
 
 This tool allows you to easily synthesize speech, save it to an MP3 file, or play it directly from your terminal on macOS, Linux, and Windows.
 
 ## Prerequisites
 
 1. **Go:** Install Go `1.25+` (matches `go.mod`).
-2. **Google Cloud API Key:** You need an API key for the Google Cloud Text-to-Speech API.
-   - Go to Google Cloud Console > APIs & Services > Credentials.
-   - Create an API Key and restrict it to the "Cloud Text-to-Speech API".
+2. **Cloud Provider API Key:** You need an API key for your chosen TTS provider.
+   - **Google Cloud:** Go to Google Cloud Console > APIs & Services > Credentials. Create an API Key and restrict it to the "Cloud Text-to-Speech API".
+   - **Other providers:** Support coming soon.
 3. **Audio Player (Linux Only):** If you are running on Linux and want to use the `speak` command (which plays audio), you need an audio player installed. The CLI looks for `mpg123`, `paplay`, or `ffplay`.
    - Ubuntu/Debian: `sudo apt install mpg123`
 4. **Staticcheck (for local quality checks):** Optional but recommended for contributors.
@@ -146,15 +146,48 @@ If you built locally with `make build`, run `./ttscli ...` from the repo root.
 If you manually copied the binary into a personal bin directory such as `~/.local/bin`, run `ttscli ...` after adding that directory to your `PATH`.
 On Windows, the equivalent is typically `ttscli.exe` from a directory such as `%USERPROFILE%\bin` after adding it to `Path`.
 
+### Profile System
+
+`ttscli` uses a profile-based configuration system that allows you to manage multiple TTS provider configurations. Each profile contains:
+
+- **Provider**: The TTS service provider (e.g., `gcp`, `aws`, `azure`)
+- **Name**: A unique name for the profile (e.g., `default`, `work`, `personal`)
+- **Credentials**: Provider-specific authentication (e.g., API keys)
+- **Defaults**: Default language and voice settings for that profile
+
+**Profile Key Format**: `{provider}:{name}` (e.g., `gcp:default`, `aws:work`)
+
+**Profile Resolution**:
+1. `--profile` flag or `TTSCLI_PROFILE` environment variable
+2. Active profile from config
+3. First available profile
+4. Error if no profiles exist
+
+**Current Provider Support**:
+- ✅ **Google Cloud (GCP)**: Fully implemented
+- 🚧 **AWS Polly**: Planned
+- 🚧 **Azure Speech**: Planned
+- 🚧 **IBM Watson**: Planned
+- 🚧 **Alibaba Cloud**: Planned
+
+### Backward Compatibility
+
+For users upgrading from previous versions, `ttscli` maintains backward compatibility with the legacy `default` command system. The `setup` command creates both a new profile and saves legacy defaults, ensuring existing workflows continue to work.
+
 ### Command Reference
 
 - `ttscli speak`: Synthesize text to speech and play it immediately.
 - `ttscli save`: Synthesize text to speech and save MP3 output.
 - `ttscli voices`: List available voices (optionally filter with `--lang`).
-- `ttscli setup`: Interactive first-run setup (API key + defaults + optional sound check).
-- `ttscli doctor`: Health checks (config, API key, API connectivity, playback). Returns non-zero when checks fail.
+- `ttscli setup`: Interactive first-run setup (creates a GCP profile).
+- `ttscli doctor`: Health checks (config, profiles, API connectivity, playback). Returns non-zero when checks fail.
 - `ttscli completion <bash|zsh|fish>`: Prints shell completion script to stdout.
-- `ttscli default set|get|unset`: Manage saved defaults (`voice`, `lang`, `apiKey`).
+- `ttscli profile list`: List all configured profiles.
+- `ttscli profile create`: Create a new profile with provider credentials.
+- `ttscli profile delete <provider:name>`: Delete a profile.
+- `ttscli profile use <provider:name>`: Set the active profile.
+- `ttscli profile get <provider:name>`: Show profile details.
+- `ttscli default set|get|unset`: Manage saved defaults (legacy, for backward compatibility).
 - `ttscli --version`: Print build metadata.
 - `ttscli --help`: Show top-level help.
 
@@ -163,8 +196,9 @@ On Windows, the equivalent is typically `ttscli.exe` from a directory such as `%
 | Flag | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `--text` | string | `""` | Required for `speak`. Alias: `-t`. |
-| `--lang` | string | `en-US` | Language code for speak (or saved default, if configured). Alias: `-l`. |
-| `--voice` | string | `en-US-Neural2-F` | Voice name for synth (or saved default, if configured). Alias: `-v`. |
+| `--lang` | string | `en-US` | Language code for speak (or profile default). Alias: `-l`. |
+| `--voice` | string | `en-US-Neural2-F` | Voice name for synth (or profile default). Alias: `-v`. |
+| `--profile` | string | `""` | Profile to use (e.g., `gcp:default`). Alias: `-p`. |
 
 ### `save` Flags
 
@@ -172,14 +206,16 @@ On Windows, the equivalent is typically `ttscli.exe` from a directory such as `%
 | --- | --- | --- | --- |
 | `--text` | string | `""` | Required for `save`. Alias: `-t`. |
 | `--out` | string | `""` | Required output MP3 path. Alias: `-o`. |
-| `--lang` | string | `en-US` | Language code for save (or saved default, if configured). Alias: `-l`. |
-| `--voice` | string | `en-US-Neural2-F` | Voice name for save (or saved default, if configured). Alias: `-v`. |
+| `--lang` | string | `en-US` | Language code for save (or profile default). Alias: `-l`. |
+| `--voice` | string | `en-US-Neural2-F` | Voice name for save (or profile default). Alias: `-v`. |
+| `--profile` | string | `""` | Profile to use (e.g., `gcp:default`). Alias: `-p`. |
 
 ### `voices` Flags
 
 | Flag | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `--lang` | string | `en-US` | Optional language filter for voice listing. Alias: `-l`. |
+| `--profile` | string | `""` | Profile to use (e.g., `gcp:default`). Alias: `-p`. |
 
 ### `default set` / `default unset` Flags
 
@@ -206,19 +242,54 @@ ttscli setup
 ttscli doctor
 ```
 
-**3. Generate shell completions:**
+**3. Manage profiles:**
+```bash
+# List all profiles
+ttscli profile list
+
+# Create a new profile
+ttscli profile create --provider gcp --name work --api-key YOUR_API_KEY
+
+# Set active profile
+ttscli profile use gcp:work
+
+# View profile details
+ttscli profile get gcp:work
+
+# Delete a profile
+ttscli profile delete gcp:work
+```
+
+**4. Generate shell completions:**
 ```bash
 ttscli completion zsh
 ```
 
-**4. Play audio immediately (without saving):**
+**5. Play audio immediately (without saving):**
 ```bash
+# Using active profile
 ttscli speak --text "Hello world, this is a test."
+
+# Using specific profile
+ttscli speak --text "Hello world, this is a test." --profile gcp:work
 ```
 
-**5. Save audio to a file:**
+**6. Save audio to a file:**
 ```bash
+# Using active profile
 ttscli save --text "Save this to a file." --out output.mp3
+
+# Using specific profile
+ttscli save --text "Save this to a file." --out output.mp3 --profile gcp:work
+```
+
+**7. List voices:**
+```bash
+# Using active profile
+ttscli voices --lang en-GB
+
+# Using specific profile
+ttscli voices --lang en-GB --profile gcp:work
 ```
 
 ### Alias Quick Examples
