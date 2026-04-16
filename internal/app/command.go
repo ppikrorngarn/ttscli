@@ -48,34 +48,51 @@ func runDefaultCommand(cfg cli.Config, stdout io.Writer) error {
 }
 
 func runSetupCommand(stdout, stderr io.Writer) error {
-	defaults, err := loadDefaults()
+	appCfg, err := loadConfig()
 	if err != nil {
-		return fmt.Errorf("load defaults: %w", err)
+		return fmt.Errorf("load config: %w", err)
 	}
 
 	reader := bufio.NewReader(setupInput)
 	envAPIKey := strings.TrimSpace(lookupEnv(apiKeyEnvVar))
-	currentAPIKey := strings.TrimSpace(defaults.APIKey)
 
 	fmt.Fprintln(stdout, "Welcome to ttscli setup.")
+	fmt.Fprintln(stdout, "This will create a new GCP profile for text-to-speech.")
+	fmt.Fprintln(stdout)
+
+	profileName := "default"
+	profileKey := "gcp:" + profileName
+
+	if len(appCfg.Profiles) > 0 {
+		inputProfileName, err := promptLine(reader, stdout, "Profile name [default]: ")
+		if err != nil {
+			return fmt.Errorf("read profile name: %w", err)
+		}
+		profileName = strings.TrimSpace(inputProfileName)
+		if profileName == "" {
+			profileName = "default"
+		}
+
+		profileKey = "gcp:" + profileName
+		if _, exists := appCfg.Profiles[profileKey]; exists {
+			fmt.Fprintf(stdout, "Profile %s already exists. Use 'ttscli profile use %s' to activate it.\n", profileKey, profileKey)
+			return nil
+		}
+	}
+
+	fmt.Fprintln(stdout)
 	fmt.Fprintf(stdout, "Press Enter on language/voice to use built-in defaults: %s / %s.\n", cli.DefaultLanguage, cli.DefaultVoice)
 	if envAPIKey != "" {
 		fmt.Fprintf(stdout, "Detected %s in environment; press Enter for API key to use it.\n", apiKeyEnvVar)
 	}
 
-	apiKeyPrompt := "Google Cloud API key: "
-	if currentAPIKey != "" {
-		apiKeyPrompt = "Google Cloud API key (press Enter to keep saved key): "
-	}
-	inputAPIKey, err := promptLine(reader, stdout, apiKeyPrompt)
+	inputAPIKey, err := promptLine(reader, stdout, "Google Cloud API key: ")
 	if err != nil {
 		return fmt.Errorf("read api key: %w", err)
 	}
 	apiKey := strings.TrimSpace(inputAPIKey)
 	if apiKey == "" {
-		if currentAPIKey != "" {
-			apiKey = currentAPIKey
-		} else if envAPIKey != "" {
+		if envAPIKey != "" {
 			apiKey = envAPIKey
 		}
 	}
@@ -101,24 +118,53 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 		voice = cli.DefaultVoice
 	}
 
+	fmt.Fprintln(stdout, "Validating API key and voice...")
+
+	profile := config.Profile{
+		Provider: "gcp",
+		Name:     profileName,
+		Credentials: map[string]interface{}{
+			"apiKey": apiKey,
+		},
+		Defaults: map[string]string{
+			"lang":  lang,
+			"voice": voice,
+		},
+	}
+
+	provider, err := newProvider(profile)
+	if err != nil {
+		return fmt.Errorf("create provider: %w", err)
+	}
+
 	ctx, stop := newAppCtx()
 	defer stop()
 
-	client := newTTSClient(apiKey)
-	voices, err := client.ListVoices(ctx, lang)
+	voices, err := provider.ListVoices(ctx, lang)
 	if err != nil {
-		return fmt.Errorf("validate defaults via list voices: %w", err)
+		return fmt.Errorf("validate provider: %w", err)
 	}
 	if !voiceExists(voice, voices) {
 		return fmt.Errorf("voice %q is not available for language %q", voice, lang)
 	}
 
-	merged := defaults
-	merged.APIKey = apiKey
-	merged.Lang = lang
-	merged.Voice = voice
-	if err := saveDefaults(merged); err != nil {
-		return fmt.Errorf("save defaults: %w", err)
+	appCfg.Profiles[profileKey] = profile
+	if appCfg.ActiveProvider == "" && appCfg.ActiveProfile == "" {
+		appCfg.ActiveProvider = "gcp"
+		appCfg.ActiveProfile = profileName
+	}
+
+	if err := saveConfig(appCfg); err != nil {
+		return fmt.Errorf("save config: %w", err)
+	}
+
+	legacyDefaults := config.Defaults{
+		Voice:  voice,
+		Lang:   lang,
+		APIKey: apiKey,
+	}
+	if err := saveDefaults(legacyDefaults); err != nil {
+		return fmt.Errorf("save legacy defaults: %w", err)
 	}
 
 	runCheck, err := promptYesNo(reader, stdout, "Run sound check now? [Y/n]: ", true)
@@ -127,7 +173,13 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 	}
 	if runCheck {
 		fmt.Fprintln(stdout, "Running sound check...")
-		audioBytes, err := client.Synthesize(ctx, setupSoundCheckText, lang, voice, tts.AudioEncodingMP3)
+		req := tts.SynthRequest{
+			Text:          setupSoundCheckText,
+			LanguageCode:  lang,
+			VoiceName:     voice,
+			AudioEncoding: tts.AudioEncodingMP3,
+		}
+		audioBytes, err := provider.SynthesizeRequest(ctx, req)
 		if err != nil {
 			return fmt.Errorf("failed to synthesize sound check: %w", err)
 		}
@@ -141,8 +193,13 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("resolve config path: %w", err)
 	}
+	fmt.Fprintln(stdout)
 	fmt.Fprintln(stdout, "Setup complete.")
-	fmt.Fprintf(stdout, "Saved defaults: voice=%s lang=%s apiKey=%s\n", merged.Voice, merged.Lang, maskAPIKey(merged.APIKey))
+	fmt.Fprintf(stdout, "Created profile: %s\n", profileKey)
+	fmt.Fprintf(stdout, "Profile settings: voice=%s lang=%s apiKey=%s\n", voice, lang, maskAPIKey(apiKey))
+	if appCfg.ActiveProvider == "gcp" && appCfg.ActiveProfile == profileName {
+		fmt.Fprintf(stdout, "Profile set as active.\n")
+	}
 	fmt.Fprintf(stdout, "Config file: %s\n", cfgPath)
 	return nil
 }
@@ -151,82 +208,186 @@ func runDoctorCommand(stdout io.Writer) error {
 	var checks []doctorCheck
 
 	defaults, defaultsErr := loadDefaults()
-	if defaultsErr != nil {
+	appCfg, cfgErr := loadConfig()
+
+	if defaultsErr != nil && cfgErr != nil {
 		checks = append(checks, doctorCheck{
-			name:   "Saved config",
+			name:   "Config file",
 			ok:     false,
-			detail: defaultsErr.Error(),
-			hint:   "Run \"ttscli default unset\" to clear invalid config, then run \"ttscli setup\".",
+			detail: fmt.Sprintf("defaults: %v, profiles: %v", defaultsErr, cfgErr),
+			hint:   "Check config file permissions and location.",
 		})
 	} else {
 		checks = append(checks, doctorCheck{
-			name:   "Saved config",
+			name:   "Config file",
 			ok:     true,
 			detail: "config file is readable",
 		})
 	}
 
-	envKey := strings.TrimSpace(lookupEnv(apiKeyEnvVar))
-	savedKey := ""
-	if defaultsErr == nil {
-		savedKey = strings.TrimSpace(defaults.APIKey)
-	}
-
+	useProfiles := len(appCfg.Profiles) > 0
 	apiKey := ""
 	apiKeySource := ""
-	switch {
-	case envKey != "":
-		apiKey = envKey
-		apiKeySource = apiKeyEnvVar
-	case savedKey != "":
-		apiKey = savedKey
-		apiKeySource = "saved config"
-	}
 
-	if apiKey == "" {
+	if useProfiles {
 		checks = append(checks, doctorCheck{
-			name:   "API key availability",
-			ok:     false,
-			detail: "no API key found in environment or saved defaults",
-			hint:   fmt.Sprintf("Run \"ttscli default set --api-key <key>\" or export %s.", apiKeyEnvVar),
-		})
-		checks = append(checks, doctorCheck{
-			name:   "API connectivity",
-			ok:     false,
-			detail: "skipped: missing API key",
-			hint:   fmt.Sprintf("Configure API key first via \"ttscli setup\" or %s.", apiKeyEnvVar),
-		})
-	} else {
-		checks = append(checks, doctorCheck{
-			name:   "API key availability",
+			name:   "Profiles",
 			ok:     true,
-			detail: fmt.Sprintf("API key found via %s", apiKeySource),
+			detail: fmt.Sprintf("%d profile(s) configured", len(appCfg.Profiles)),
 		})
 
-		ctx, stop := newAppCtx()
-		client := newTTSClient(apiKey)
-		voices, err := client.ListVoices(ctx, cli.DefaultLanguage)
-		stop()
-		if err != nil {
+		activeProfileKey := appCfg.ActiveProvider + ":" + appCfg.ActiveProfile
+		if appCfg.ActiveProvider == "" || appCfg.ActiveProfile == "" {
 			checks = append(checks, doctorCheck{
-				name:   "API connectivity",
+				name:   "Active profile",
 				ok:     false,
-				detail: err.Error(),
-				hint:   "Verify API key restrictions and Cloud Text-to-Speech API enablement.",
+				detail: "no active profile set",
+				hint:   "Run \"ttscli profile use <provider:name>\" to set an active profile.",
 			})
-		} else if len(voices) == 0 {
 			checks = append(checks, doctorCheck{
 				name:   "API connectivity",
 				ok:     false,
-				detail: "connected but returned no voices",
-				hint:   "Check API permissions and account/project status.",
+				detail: "skipped: no active profile",
+				hint:   "Set an active profile first.",
+			})
+		} else {
+			profile, profileErr := getProfile(appCfg, activeProfileKey)
+			if profileErr != nil {
+				checks = append(checks, doctorCheck{
+					name:   "Active profile",
+					ok:     false,
+					detail: profileErr.Error(),
+					hint:   "Run \"ttscli profile use <provider:name>\" to set a valid active profile.",
+				})
+				checks = append(checks, doctorCheck{
+					name:   "API connectivity",
+					ok:     false,
+					detail: "skipped: invalid active profile",
+					hint:   "Fix or change the active profile.",
+				})
+			} else {
+				checks = append(checks, doctorCheck{
+					name:   "Active profile",
+					ok:     true,
+					detail: fmt.Sprintf("%s (provider: %s)", activeProfileKey, profile.Provider),
+				})
+
+				provider, providerErr := newProvider(profile)
+				if providerErr != nil {
+					checks = append(checks, doctorCheck{
+						name:   "Provider initialization",
+						ok:     false,
+						detail: providerErr.Error(),
+						hint:   "Check profile credentials and configuration.",
+					})
+					checks = append(checks, doctorCheck{
+						name:   "API connectivity",
+						ok:     false,
+						detail: "skipped: provider initialization failed",
+						hint:   "Fix provider initialization errors first.",
+					})
+				} else {
+					checks = append(checks, doctorCheck{
+						name:   "Provider initialization",
+						ok:     true,
+						detail: fmt.Sprintf("%s provider initialized", provider.Name()),
+					})
+
+					apiKey = resolveProfileAPIKey(profile)
+					apiKeySource = fmt.Sprintf("profile %s", activeProfileKey)
+
+					ctx, stop := newAppCtx()
+					testLang := cli.DefaultLanguage
+					if lang, ok := profile.Defaults["lang"]; ok && lang != "" {
+						testLang = lang
+					}
+					voices, err := provider.ListVoices(ctx, testLang)
+					stop()
+					if err != nil {
+						checks = append(checks, doctorCheck{
+							name:   "API connectivity",
+							ok:     false,
+							detail: err.Error(),
+							hint:   "Verify API key, permissions, and service enablement.",
+						})
+					} else if len(voices) == 0 {
+						checks = append(checks, doctorCheck{
+							name:   "API connectivity",
+							ok:     false,
+							detail: "connected but returned no voices",
+							hint:   "Check API permissions and account/project status.",
+						})
+					} else {
+						checks = append(checks, doctorCheck{
+							name:   "API connectivity",
+							ok:     true,
+							detail: fmt.Sprintf("successfully listed %d voices for %s", len(voices), testLang),
+						})
+					}
+				}
+			}
+		}
+	} else {
+		envKey := strings.TrimSpace(lookupEnv(apiKeyEnvVar))
+		savedKey := ""
+		if defaultsErr == nil {
+			savedKey = strings.TrimSpace(defaults.APIKey)
+		}
+
+		switch {
+		case envKey != "":
+			apiKey = envKey
+			apiKeySource = apiKeyEnvVar
+		case savedKey != "":
+			apiKey = savedKey
+			apiKeySource = "saved defaults"
+		}
+
+		if apiKey == "" {
+			checks = append(checks, doctorCheck{
+				name:   "API key availability",
+				ok:     false,
+				detail: "no API key found in environment or saved defaults",
+				hint:   fmt.Sprintf("Run \"ttscli default set --api-key <key>\" or export %s.", apiKeyEnvVar),
+			})
+			checks = append(checks, doctorCheck{
+				name:   "API connectivity",
+				ok:     false,
+				detail: "skipped: missing API key",
+				hint:   fmt.Sprintf("Configure API key first via \"ttscli setup\" or %s.", apiKeyEnvVar),
 			})
 		} else {
 			checks = append(checks, doctorCheck{
-				name:   "API connectivity",
+				name:   "API key availability",
 				ok:     true,
-				detail: fmt.Sprintf("successfully listed %d voices for %s", len(voices), cli.DefaultLanguage),
+				detail: fmt.Sprintf("API key found via %s", apiKeySource),
 			})
+
+			ctx, stop := newAppCtx()
+			client := newTTSClient(apiKey)
+			voices, err := client.ListVoices(ctx, cli.DefaultLanguage)
+			stop()
+			if err != nil {
+				checks = append(checks, doctorCheck{
+					name:   "API connectivity",
+					ok:     false,
+					detail: err.Error(),
+					hint:   "Verify API key restrictions and Cloud Text-to-Speech API enablement.",
+				})
+			} else if len(voices) == 0 {
+				checks = append(checks, doctorCheck{
+					name:   "API connectivity",
+					ok:     false,
+					detail: "connected but returned no voices",
+					hint:   "Check API permissions and account/project status.",
+				})
+			} else {
+				checks = append(checks, doctorCheck{
+					name:   "API connectivity",
+					ok:     true,
+					detail: fmt.Sprintf("successfully listed %d voices for %s", len(voices), cli.DefaultLanguage),
+				})
+			}
 		}
 	}
 

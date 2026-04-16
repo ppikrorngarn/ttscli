@@ -39,6 +39,23 @@ func TestRunSetupUsesBuiltInDefaultsOnEnter(t *testing.T) {
 			},
 		}
 	}
+	newProvider = func(profile config.Profile) (tts.Provider, error) {
+		if apiKey, ok := profile.Credentials["apiKey"].(string); ok && apiKey != "new-key" {
+			t.Fatalf("unexpected api key: %q", apiKey)
+		}
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, langCode string) ([]tts.Voice, error) {
+				if langCode != cli.DefaultLanguage {
+					t.Fatalf("unexpected lang: %q", langCode)
+				}
+				return []tts.Voice{{Name: cli.DefaultVoice}}, nil
+			},
+			synthesizeFn: func(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
+				t.Fatal("sound check should not run")
+				return nil, nil
+			},
+		}, nil
+	}
 
 	var saved config.Defaults
 	saveDefaults = func(d config.Defaults) error {
@@ -76,6 +93,19 @@ func TestRunSetupUsesEnvAPIKeyWhenPromptEmpty(t *testing.T) {
 				return nil, nil
 			},
 		}
+	}
+	newProvider = func(profile config.Profile) (tts.Provider, error) {
+		if apiKey, ok := profile.Credentials["apiKey"].(string); ok && apiKey != "env-key" {
+			t.Fatalf("expected env key to be used, got %q", apiKey)
+		}
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, langCode string) ([]tts.Voice, error) {
+				return []tts.Voice{{Name: cli.DefaultVoice}}, nil
+			},
+			synthesizeFn: func(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
+				return nil, nil
+			},
+		}, nil
 	}
 
 	err := Run([]string{"setup"}, &bytes.Buffer{}, &bytes.Buffer{})
@@ -122,6 +152,17 @@ func TestRunSetupSoundCheckYes(t *testing.T) {
 				return []byte("audio"), nil
 			},
 		}
+	}
+	newProvider = func(profile config.Profile) (tts.Provider, error) {
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, langCode string) ([]tts.Voice, error) {
+				return []tts.Voice{{Name: cli.DefaultVoice}}, nil
+			},
+			synthesizeFn: func(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
+				synthCalled = true
+				return []byte("audio"), nil
+			},
+		}, nil
 	}
 
 	playCalled := false

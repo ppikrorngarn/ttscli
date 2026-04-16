@@ -121,6 +121,7 @@ func TestRunDoctorFailsWhenConfigUnreadable(t *testing.T) {
 		return cli.Config{Mode: cli.ModeDoctor}, nil
 	}
 	loadDefaults = func() (config.Defaults, error) { return config.Defaults{}, errors.New("bad config") }
+	loadConfig = func() (config.Config, error) { return config.Config{}, errors.New("bad config") }
 	lookupEnv = func(_ string) string { return "" }
 	currentGOOS = func() string { return "linux" }
 	lookPathCmd = func(file string) (string, error) {
@@ -136,7 +137,7 @@ func TestRunDoctorFailsWhenConfigUnreadable(t *testing.T) {
 		t.Fatal("expected doctor failure when config is unreadable")
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "[FAIL] Saved config") {
+	if !strings.Contains(out, "[FAIL] Config file") {
 		t.Fatalf("unexpected output: %q", out)
 	}
 }

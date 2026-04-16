@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"strings"
@@ -414,6 +415,10 @@ type fakeTTSClient struct {
 	synthesizeFn func(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error)
 }
 
+func (f *fakeTTSClient) Name() string {
+	return "gcp"
+}
+
 func (f *fakeTTSClient) ListVoices(ctx context.Context, langCode string) ([]tts.Voice, error) {
 	return f.listVoicesFn(ctx, langCode)
 }
@@ -422,15 +427,30 @@ func (f *fakeTTSClient) Synthesize(ctx context.Context, text, languageCode, voic
 	return f.synthesizeFn(ctx, text, languageCode, voiceName, audioEncoding)
 }
 
+func (f *fakeTTSClient) SynthesizeRequest(ctx context.Context, req tts.SynthRequest) ([]byte, error) {
+	return f.synthesizeFn(ctx, req.Text, req.LanguageCode, req.VoiceName, req.AudioEncoding)
+}
+
+func (f *fakeTTSClient) DefaultVoice(langCode string) string {
+	if langCode == "en-US" {
+		return "en-US-Neural2-F"
+	}
+	return ""
+}
+
 func stubAppDeps() func() {
 	oldParseArgs := parseArgs
 	oldLookupEnv := lookupEnv
 	oldCurrentGOOS := currentGOOS
 	oldLookPathCmd := lookPathCmd
 	oldNewTTSClient := newTTSClient
+	oldNewProvider := newProvider
 	oldLoadDefaults := loadDefaults
 	oldSaveDefaults := saveDefaults
 	oldClearDefaults := clearDefaults
+	oldLoadConfig := loadConfig
+	oldSaveConfig := saveConfig
+	oldGetProfile := getProfile
 	oldPrintVoices := printVoices
 	oldWriteFile := writeFile
 	oldPlayAudio := playAudio
@@ -440,6 +460,14 @@ func stubAppDeps() func() {
 	loadDefaults = func() (config.Defaults, error) { return config.Defaults{}, nil }
 	saveDefaults = func(config.Defaults) error { return nil }
 	clearDefaults = func() error { return nil }
+	loadConfig = func() (config.Config, error) { return config.Config{Profiles: make(map[string]config.Profile)}, nil }
+	saveConfig = func(config.Config) error { return nil }
+	getProfile = func(cfg config.Config, key string) (config.Profile, error) {
+		if profile, ok := cfg.Profiles[key]; ok {
+			return profile, nil
+		}
+		return config.Profile{}, fmt.Errorf("profile not found")
+	}
 
 	return func() {
 		parseArgs = oldParseArgs
@@ -447,9 +475,13 @@ func stubAppDeps() func() {
 		currentGOOS = oldCurrentGOOS
 		lookPathCmd = oldLookPathCmd
 		newTTSClient = oldNewTTSClient
+		newProvider = oldNewProvider
 		loadDefaults = oldLoadDefaults
 		saveDefaults = oldSaveDefaults
 		clearDefaults = oldClearDefaults
+		loadConfig = oldLoadConfig
+		saveConfig = oldSaveConfig
+		getProfile = oldGetProfile
 		printVoices = oldPrintVoices
 		writeFile = oldWriteFile
 		playAudio = oldPlayAudio
