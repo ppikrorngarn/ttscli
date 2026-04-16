@@ -11,7 +11,7 @@ const (
 	appName               = "ttscli"
 	DefaultLanguage       = "en-US"
 	DefaultVoice          = "en-US-Neural2-F"
-	helpTitle             = "GCP Text-to-Speech CLI"
+	helpTitle             = "Multi-Provider Text-to-Speech CLI"
 	helpUsageSpeak        = `  ttscli speak --text "Hello world"`
 	helpUsageSave         = `  ttscli save --text "Hello world" --out output.mp3`
 	helpUsageVoices       = "  ttscli voices --lang en-GB"
@@ -19,14 +19,16 @@ const (
 	helpUsageDoctor       = "  ttscli doctor"
 	helpUsageCompletion   = "  ttscli completion <bash|zsh|fish>"
 	helpUsageDefault      = "  ttscli default <set|get|unset> [flags]"
+	helpUsageProfile      = "  ttscli profile <list|create|delete|use|get> [flags]"
 	helpExampleSpeak      = `  ttscli speak --text "Hello world"`
-	helpExampleSave       = `  ttscli save --text "Hello world" --out output.mp3`
+	helpExampleSave       = `  ttscli save --text "Hello world" --out output.mp3"`
 	helpExampleVoices     = "  ttscli voices --lang en-GB"
 	helpExampleSetup      = "  ttscli setup"
 	helpExampleDoctor     = "  ttscli doctor"
 	helpExampleCompletion = "  ttscli completion zsh"
 	helpExampleDefault    = "  ttscli default set --voice en-US-Chirp3-HD-Achernar --lang en-US"
-	helpAliases           = "Short aliases: -t/--text, -o/--out, -l/--lang, -v/--voice, -k/--api-key"
+	helpExampleProfile    = "  ttscli profile create --provider gcp --name default --api-key YOUR_KEY"
+	helpAliases           = "Short aliases: -t/--text, -o/--out, -l/--lang, -v/--voice, -k/--api-key, -p/--profile"
 	ModeSpeak             = "speak"
 	ModeSave              = "save"
 	ModeVoices            = "voices"
@@ -34,9 +36,15 @@ const (
 	ModeSetup             = "setup"
 	ModeDoctor            = "doctor"
 	ModeCompletion        = "completion"
+	ModeProfile           = "profile"
 	DefaultSet            = "set"
 	DefaultGet            = "get"
 	DefaultUnset          = "unset"
+	ProfileList           = "list"
+	ProfileCreate         = "create"
+	ProfileDelete         = "delete"
+	ProfileUse            = "use"
+	ProfileGet            = "get"
 )
 
 var supportedCompletionShells = map[string]struct{}{
@@ -101,8 +109,11 @@ func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 	if len(args) > 0 && args[0] == ModeCompletion {
 		return parseCompletionCommand(args[1:])
 	}
+	if len(args) > 0 && args[0] == ModeProfile {
+		return parseProfileCommand(args[1:], stderr)
+	}
 
-	return Config{}, fmt.Errorf("unsupported command %q (use: speak, save, voices, setup, doctor, completion, default)", args[0])
+	return Config{}, fmt.Errorf("unsupported command %q (use: speak, save, voices, setup, doctor, completion, default, profile)", args[0])
 }
 
 func parseCompletionCommand(args []string) (Config, error) {
@@ -133,6 +144,8 @@ func parseSpeakCommand(args []string, stderr io.Writer) (Config, error) {
 	fs.StringVar(&cfg.Lang, "l", DefaultLanguage, "Language code (shorthand)")
 	fs.StringVar(&cfg.Voice, "voice", DefaultVoice, "Voice name")
 	fs.StringVar(&cfg.Voice, "v", DefaultVoice, "Voice name (shorthand)")
+	fs.StringVar(&cfg.Profile, "profile", "", "Profile to use (e.g., gcp:default)")
+	fs.StringVar(&cfg.Profile, "p", "", "Profile to use (shorthand)")
 
 	if err := fs.Parse(args); err != nil {
 		return cfg, err
@@ -169,6 +182,8 @@ func parseSaveCommand(args []string, stderr io.Writer) (Config, error) {
 	fs.StringVar(&cfg.Lang, "l", DefaultLanguage, "Language code (shorthand)")
 	fs.StringVar(&cfg.Voice, "voice", DefaultVoice, "Voice name")
 	fs.StringVar(&cfg.Voice, "v", DefaultVoice, "Voice name (shorthand)")
+	fs.StringVar(&cfg.Profile, "profile", "", "Profile to use (e.g., gcp:default)")
+	fs.StringVar(&cfg.Profile, "p", "", "Profile to use (shorthand)")
 
 	if err := fs.Parse(args); err != nil {
 		return cfg, err
@@ -200,6 +215,8 @@ func parseVoicesCommand(args []string, stderr io.Writer) (Config, error) {
 	fs.SetOutput(stderr)
 	fs.StringVar(&cfg.Lang, "lang", DefaultLanguage, "Language code")
 	fs.StringVar(&cfg.Lang, "l", DefaultLanguage, "Language code (shorthand)")
+	fs.StringVar(&cfg.Profile, "profile", "", "Profile to use (e.g., gcp:default)")
+	fs.StringVar(&cfg.Profile, "p", "", "Profile to use (shorthand)")
 
 	if err := fs.Parse(args); err != nil {
 		return cfg, err
@@ -228,6 +245,7 @@ func printHelp(stderr io.Writer) {
 	fmt.Fprintln(stderr, helpUsageDoctor)
 	fmt.Fprintln(stderr, helpUsageCompletion)
 	fmt.Fprintln(stderr, helpUsageDefault)
+	fmt.Fprintln(stderr, helpUsageProfile)
 	fmt.Fprintln(stderr, "  ttscli --version")
 	fmt.Fprintln(stderr)
 	fmt.Fprintln(stderr, helpAliases)
@@ -240,6 +258,7 @@ func printHelp(stderr io.Writer) {
 	fmt.Fprintln(stderr, helpExampleDoctor)
 	fmt.Fprintln(stderr, helpExampleCompletion)
 	fmt.Fprintln(stderr, helpExampleDefault)
+	fmt.Fprintln(stderr, helpExampleProfile)
 }
 
 func parseDefaultCommand(args []string, stderr io.Writer) (Config, error) {
@@ -302,5 +321,70 @@ func parseDefaultCommand(args []string, stderr io.Writer) (Config, error) {
 		return cfg, nil
 	default:
 		return cfg, fmt.Errorf("unsupported default subcommand %q (use: set, get, unset)", cfg.DefaultSubcommand)
+	}
+}
+
+func parseProfileCommand(args []string, stderr io.Writer) (Config, error) {
+	cfg := Config{Mode: ModeProfile}
+	if len(args) == 0 {
+		return cfg, fmt.Errorf("please provide a profile subcommand: list, create, delete, use, or get")
+	}
+
+	subcommand := args[0]
+	cfg.DefaultSubcommand = subcommand
+
+	switch subcommand {
+	case ProfileList:
+		if len(args) > 1 {
+			return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(args[1:], " "))
+		}
+		return cfg, nil
+	case ProfileCreate:
+		fs := flag.NewFlagSet(appName+" profile create", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		fs.StringVar(&cfg.APIKey, "api-key", "", "API key for the provider")
+		fs.StringVar(&cfg.APIKey, "k", "", "API key for the provider (shorthand)")
+		fs.StringVar(&cfg.Lang, "provider", "", "Provider name (gcp, aws, azure, ibm, alibaba)")
+		fs.StringVar(&cfg.Lang, "P", "", "Provider name (shorthand)")
+		fs.StringVar(&cfg.Voice, "name", "", "Profile name")
+		fs.StringVar(&cfg.Voice, "n", "", "Profile name (shorthand)")
+		fs.StringVar(&cfg.SavePath, "voice", "", "Default voice for this profile")
+		fs.StringVar(&cfg.SavePath, "v", "", "Default voice for this profile (shorthand)")
+		if err := fs.Parse(args[1:]); err != nil {
+			return cfg, err
+		}
+		if fs.NArg() > 0 {
+			return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(fs.Args(), " "))
+		}
+		return cfg, nil
+	case ProfileDelete:
+		if len(args) < 2 {
+			return cfg, fmt.Errorf("please provide profile key to delete (e.g., gcp:default)")
+		}
+		if len(args) > 2 {
+			return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(args[2:], " "))
+		}
+		cfg.Profile = args[1]
+		return cfg, nil
+	case ProfileUse:
+		if len(args) < 2 {
+			return cfg, fmt.Errorf("please provide profile key to use (e.g., gcp:default)")
+		}
+		if len(args) > 2 {
+			return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(args[2:], " "))
+		}
+		cfg.Profile = args[1]
+		return cfg, nil
+	case ProfileGet:
+		if len(args) < 2 {
+			return cfg, fmt.Errorf("please provide profile key to get (e.g., gcp:default)")
+		}
+		if len(args) > 2 {
+			return cfg, fmt.Errorf("unexpected positional arguments: %s", strings.Join(args[2:], " "))
+		}
+		cfg.Profile = args[1]
+		return cfg, nil
+	default:
+		return cfg, fmt.Errorf("unsupported profile subcommand %q (use: list, create, delete, use, get)", subcommand)
 	}
 }

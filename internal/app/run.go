@@ -24,6 +24,8 @@ func Run(args []string, stdout, stderr io.Writer) error {
 		return runDoctorCommand(stdout)
 	case cli.ModeCompletion:
 		return runCompletionCommand(cfg, stdout)
+	case cli.ModeProfile:
+		return runProfileCommand(cfg, stdout)
 	case "":
 		// Test compatibility when ParseArgs is stubbed without mode.
 		cfg.Mode = cli.ModeSpeak
