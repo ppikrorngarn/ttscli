@@ -1,7 +1,8 @@
 package config
 
 import (
-	"io/fs"
+	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +13,7 @@ func stubConfigDeps() func() {
 	oldExecutablePath := executablePath
 	oldFileExists := fileExists
 	oldReadFile := readFile
+	oldWriteFile := writeFile
 	oldMkdirAll := mkdirAll
 	oldRemoveFile := removeFile
 
@@ -22,13 +24,13 @@ func stubConfigDeps() func() {
 		return "/tmp/app/config.json", nil
 	}
 	fileExists = func(path string) (bool, error) {
-		if path == "/tmp/app/config.json" {
-			return false, nil
-		}
-		return false, &fs.PathError{Op: "stat", Path: path, Err: fs.ErrNotExist}
+		return false, nil
 	}
 	readFile = func(path string) ([]byte, error) {
-		return nil, &fs.PathError{Op: "read", Path: path, Err: fs.ErrNotExist}
+		return nil, os.ErrNotExist
+	}
+	writeFile = func(path string, data []byte, perm os.FileMode) error {
+		return nil
 	}
 	mkdirAll = func(path string, perm os.FileMode) error {
 		return nil
@@ -42,25 +44,13 @@ func stubConfigDeps() func() {
 		executablePath = oldExecutablePath
 		fileExists = oldFileExists
 		readFile = oldReadFile
+		writeFile = oldWriteFile
 		mkdirAll = oldMkdirAll
 		removeFile = oldRemoveFile
 	}
 }
 
-func TestPath(t *testing.T) {
-	reset := stubConfigDeps()
-	defer reset()
-
-	got, err := Path()
-	if err != nil {
-		t.Fatalf("Path returned error: %v", err)
-	}
-	// Since the local config doesn't exist, it falls back to user path
-	want := filepath.Join("/tmp/usercfg", appDirName, configName)
-	if got != want {
-		t.Fatalf("unexpected path: got=%q want=%q", got, want)
-	}
-}
+// Path tests
 
 func TestPathPrefersLocalConfigNextToBinaryWhenExists(t *testing.T) {
 	reset := stubConfigDeps()
@@ -91,5 +81,181 @@ func TestPathFallsBackToUserPathWhenLocalConfigMissing(t *testing.T) {
 	want := filepath.Join("/tmp/usercfg", appDirName, configName)
 	if got != want {
 		t.Fatalf("unexpected path: got=%q want=%q", got, want)
+	}
+}
+
+// LoadConfig tests
+
+func TestLoadConfigFileNotFoundReturnsEmpty(t *testing.T) {
+	reset := stubConfigDeps()
+	defer reset()
+
+	// readFile returns ErrNotExist by default in stub.
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("expected no error for missing config file, got: %v", err)
+	}
+	if cfg.Profiles == nil {
+		t.Error("expected Profiles map to be initialized")
+	}
+	if len(cfg.Profiles) != 0 {
+		t.Errorf("expected empty profiles, got: %v", cfg.Profiles)
+	}
+}
+
+func TestLoadConfigValidJSON(t *testing.T) {
+	reset := stubConfigDeps()
+	defer reset()
+
+	raw, _ := json.Marshal(Config{
+		ActiveProvider: "gcp",
+		ActiveProfile:  "default",
+		Profiles: map[string]Profile{
+			"gcp:default": {Provider: "gcp", Name: "default"},
+		},
+	})
+	readFile = func(path string) ([]byte, error) { return raw, nil }
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.ActiveProvider != "gcp" || cfg.ActiveProfile != "default" {
+		t.Errorf("unexpected active profile: %s:%s", cfg.ActiveProvider, cfg.ActiveProfile)
+	}
+	if _, ok := cfg.Profiles["gcp:default"]; !ok {
+		t.Error("expected gcp:default profile to be loaded")
+	}
+}
+
+func TestLoadConfigNilProfilesInitialized(t *testing.T) {
+	reset := stubConfigDeps()
+	defer reset()
+
+	readFile = func(path string) ([]byte, error) {
+		return []byte(`{"activeProvider":"gcp","activeProfile":"default"}`), nil
+	}
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Profiles == nil {
+		t.Error("expected Profiles to be initialized even when absent from JSON")
+	}
+}
+
+func TestLoadConfigInvalidJSON(t *testing.T) {
+	reset := stubConfigDeps()
+	defer reset()
+
+	readFile = func(path string) ([]byte, error) { return []byte(`{invalid`), nil }
+
+	_, err := LoadConfig()
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+}
+
+func TestLoadConfigReadError(t *testing.T) {
+	reset := stubConfigDeps()
+	defer reset()
+
+	readFile = func(path string) ([]byte, error) {
+		return nil, errors.New("permission denied")
+	}
+
+	_, err := LoadConfig()
+	if err == nil {
+		t.Fatal("expected error for read failure")
+	}
+}
+
+// SaveConfig tests
+
+func TestSaveConfigSuccess(t *testing.T) {
+	reset := stubConfigDeps()
+	defer reset()
+
+	var writtenPath string
+	var writtenData []byte
+	writeFile = func(path string, data []byte, perm os.FileMode) error {
+		writtenPath = path
+		writtenData = data
+		return nil
+	}
+
+	cfg := Config{
+		ActiveProvider: "gcp",
+		ActiveProfile:  "default",
+		Profiles: map[string]Profile{
+			"gcp:default": {Provider: "gcp", Name: "default"},
+		},
+	}
+	if err := SaveConfig(cfg); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if writtenPath == "" {
+		t.Error("expected writeFile to be called")
+	}
+	var parsed Config
+	if err := json.Unmarshal(writtenData, &parsed); err != nil {
+		t.Fatalf("written data is not valid JSON: %v", err)
+	}
+	if parsed.ActiveProvider != "gcp" {
+		t.Errorf("unexpected active provider in saved data: %q", parsed.ActiveProvider)
+	}
+}
+
+func TestSaveConfigMkdirError(t *testing.T) {
+	reset := stubConfigDeps()
+	defer reset()
+
+	mkdirAll = func(path string, perm os.FileMode) error {
+		return errors.New("mkdir failed")
+	}
+
+	err := SaveConfig(Config{Profiles: map[string]Profile{}})
+	if err == nil {
+		t.Fatal("expected error when mkdir fails")
+	}
+}
+
+func TestSaveConfigWriteError(t *testing.T) {
+	reset := stubConfigDeps()
+	defer reset()
+
+	writeFile = func(path string, data []byte, perm os.FileMode) error {
+		return errors.New("write failed")
+	}
+
+	err := SaveConfig(Config{Profiles: map[string]Profile{}})
+	if err == nil {
+		t.Fatal("expected error when write fails")
+	}
+}
+
+// GetProfile tests
+
+func TestGetProfileFound(t *testing.T) {
+	cfg := Config{
+		Profiles: map[string]Profile{
+			"gcp:default": {Provider: "gcp", Name: "default"},
+		},
+	}
+	profile, err := GetProfile(cfg, "gcp:default")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if profile.Provider != "gcp" || profile.Name != "default" {
+		t.Errorf("unexpected profile: %+v", profile)
+	}
+}
+
+func TestGetProfileNotFound(t *testing.T) {
+	cfg := Config{Profiles: map[string]Profile{}}
+	_, err := GetProfile(cfg, "gcp:nonexistent")
+	if err == nil {
+		t.Fatal("expected error for missing profile")
 	}
 }

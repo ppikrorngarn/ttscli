@@ -329,3 +329,159 @@ func TestParseCLIArgsCompletionRejectsExtraArgs(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestParseCLIArgsSpeakWithProfileFlag(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"speak", "--text", "hello", "--profile", "gcp:work"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Profile != "gcp:work" {
+		t.Errorf("expected profile gcp:work, got %q", cfg.Profile)
+	}
+}
+
+func TestParseCLIArgsSpeakWithProfileShorthand(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"speak", "--text", "hello", "-p", "gcp:work"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Profile != "gcp:work" {
+		t.Errorf("expected profile gcp:work, got %q", cfg.Profile)
+	}
+}
+
+func TestParseCLIArgsSaveWithProfileFlag(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"save", "--text", "hello", "--out", "out.mp3", "--profile", "gcp:work"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Profile != "gcp:work" {
+		t.Errorf("expected profile gcp:work, got %q", cfg.Profile)
+	}
+}
+
+func TestParseCLIArgsVoicesWithProfileFlag(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"voices", "--profile", "gcp:work"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Profile != "gcp:work" {
+		t.Errorf("expected profile gcp:work, got %q", cfg.Profile)
+	}
+}
+
+func TestParseCLIArgsProfileNoSubcommand(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"profile"}, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "please provide a profile subcommand") {
+		t.Fatalf("expected missing subcommand error, got: %v", err)
+	}
+}
+
+func TestParseCLIArgsProfileList(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"profile", "list"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Mode != ModeProfile || cfg.DefaultSubcommand != ProfileList {
+		t.Errorf("unexpected profile list config: %+v", cfg)
+	}
+}
+
+func TestParseCLIArgsProfileListRejectsExtraArgs(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"profile", "list", "extra"}, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "unexpected positional arguments") {
+		t.Fatalf("expected unexpected positional args error, got: %v", err)
+	}
+}
+
+func TestParseCLIArgsProfileCreate(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"profile", "create", "--provider", "gcp", "--name", "work", "--api-key", "mykey"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Mode != ModeProfile || cfg.DefaultSubcommand != ProfileCreate {
+		t.Errorf("unexpected mode/subcommand: %+v", cfg)
+	}
+	if cfg.Lang != "gcp" {
+		t.Errorf("expected provider gcp (stored in Lang), got %q", cfg.Lang)
+	}
+	if cfg.Voice != "work" {
+		t.Errorf("expected name work (stored in Voice), got %q", cfg.Voice)
+	}
+	if cfg.APIKey != "mykey" {
+		t.Errorf("expected api-key mykey, got %q", cfg.APIKey)
+	}
+}
+
+func TestParseCLIArgsProfileDelete(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"profile", "delete", "gcp:default"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.DefaultSubcommand != ProfileDelete || cfg.Profile != "gcp:default" {
+		t.Errorf("unexpected profile delete config: %+v", cfg)
+	}
+}
+
+func TestParseCLIArgsProfileDeleteMissingKey(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"profile", "delete"}, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "please provide profile key") {
+		t.Fatalf("expected missing key error, got: %v", err)
+	}
+}
+
+func TestParseCLIArgsProfileUse(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"profile", "use", "gcp:default"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.DefaultSubcommand != ProfileUse || cfg.Profile != "gcp:default" {
+		t.Errorf("unexpected profile use config: %+v", cfg)
+	}
+}
+
+func TestParseCLIArgsProfileUseMissingKey(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"profile", "use"}, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "please provide profile key") {
+		t.Fatalf("expected missing key error, got: %v", err)
+	}
+}
+
+func TestParseCLIArgsProfileGet(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"profile", "get", "gcp:default"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.DefaultSubcommand != ProfileGet || cfg.Profile != "gcp:default" {
+		t.Errorf("unexpected profile get config: %+v", cfg)
+	}
+}
+
+func TestParseCLIArgsProfileGetMissingKey(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"profile", "get"}, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "please provide profile key") {
+		t.Fatalf("expected missing key error, got: %v", err)
+	}
+}
+
+func TestParseCLIArgsProfileUnsupportedSubcommand(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"profile", "rename"}, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "unsupported profile subcommand") {
+		t.Fatalf("expected unsupported subcommand error, got: %v", err)
+	}
+}

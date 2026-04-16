@@ -1,6 +1,7 @@
 package tts
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -260,6 +261,70 @@ func TestTTSClientSynthesizeReadResponseError(t *testing.T) {
 	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
 	if err == nil || !strings.Contains(err.Error(), "read response") {
 		t.Fatalf("expected read response error, got: %v", err)
+	}
+}
+
+func TestTTSClientListVoicesErrorStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+
+	c := NewClient("k", srv.Client())
+	c.baseURL = srv.URL
+
+	_, err := c.ListVoices(context.Background(), "en-US")
+	if err == nil || !strings.Contains(err.Error(), "status=401") {
+		t.Fatalf("expected status error, got: %v", err)
+	}
+}
+
+func TestNewProviderGCP(t *testing.T) {
+	p, err := NewProvider("gcp", "my-api-key")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if p.Name() != "gcp" {
+		t.Errorf("expected gcp provider name, got %q", p.Name())
+	}
+}
+
+func TestNewProviderGCPBadCreds(t *testing.T) {
+	_, err := NewProvider("gcp", 123)
+	if err == nil || !strings.Contains(err.Error(), "string API key") {
+		t.Fatalf("expected credentials error, got: %v", err)
+	}
+}
+
+func TestNewProviderUnsupported(t *testing.T) {
+	for _, name := range []string{"aws", "azure", "ibm", "alibaba"} {
+		_, err := NewProvider(name, nil)
+		if err == nil || !strings.Contains(err.Error(), "not yet implemented") {
+			t.Errorf("provider %q: expected not implemented error, got: %v", name, err)
+		}
+	}
+}
+
+func TestNewProviderUnknown(t *testing.T) {
+	_, err := NewProvider("openai", nil)
+	if err == nil || !strings.Contains(err.Error(), "unknown provider") {
+		t.Fatalf("expected unknown provider error, got: %v", err)
+	}
+}
+
+func TestPrintVoices(t *testing.T) {
+	voices := []Voice{
+		{Name: "en-US-Neural2-F", SsmlGender: "FEMALE", LanguageCodes: []string{"en-US"}},
+		{Name: "en-GB-Neural2-B", SsmlGender: "MALE", LanguageCodes: []string{"en-GB"}},
+	}
+	var buf bytes.Buffer
+	PrintVoices(&buf, "en-US", voices)
+	out := buf.String()
+	if !strings.Contains(out, "en-US-Neural2-F") || !strings.Contains(out, "FEMALE") {
+		t.Errorf("expected voice details in output, got: %q", out)
+	}
+	if !strings.Contains(out, "en-US") {
+		t.Errorf("expected language code in header, got: %q", out)
 	}
 }
 
