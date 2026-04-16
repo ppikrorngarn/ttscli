@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -29,9 +30,13 @@ var (
 	currentGOOS             = func() string { return runtime.GOOS }
 	lookPathCmd             = exec.LookPath
 	newTTSClient            = func(apiKey string) ttsService { return tts.NewClient(apiKey, nil) }
+	newProvider             = newProviderImpl
 	loadDefaults            = config.LoadDefaults
 	saveDefaults            = config.SaveDefaults
 	clearDefaults           = config.ClearDefaults
+	loadConfig              = config.LoadConfig
+	saveConfig              = config.SaveConfig
+	getProfile              = config.GetProfile
 	printVoices             = tts.PrintVoices
 	writeFile               = os.WriteFile
 	playAudio               = player.PlayAudio
@@ -40,3 +45,15 @@ var (
 		return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	}
 )
+
+func newProviderImpl(profile config.Profile) (tts.Provider, error) {
+	var creds interface{}
+	if profile.Provider == "gcp" {
+		if apiKey, ok := profile.Credentials["apiKey"].(string); ok {
+			creds = apiKey
+		} else {
+			return nil, fmt.Errorf("gcp profile missing apiKey in credentials")
+		}
+	}
+	return tts.NewProvider(profile.Provider, creds)
+}

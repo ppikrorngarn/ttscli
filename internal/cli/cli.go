@@ -59,6 +59,7 @@ type Config struct {
 	HasLangFlag       bool
 	HasAPIKeyFlag     bool
 	DefaultSubcommand string
+	Profile           string
 }
 
 func ParseArgs(args []string, stderr io.Writer) (Config, error) {

@@ -68,6 +68,25 @@ func NewClient(apiKey string, httpClient *http.Client) *Client {
 	}
 }
 
+func NewGCPClient(apiKey string, httpClient *http.Client) *Client {
+	return NewClient(apiKey, httpClient)
+}
+
+func (c *Client) Name() string {
+	return "gcp"
+}
+
+func (c *Client) SynthesizeRequest(ctx context.Context, req SynthRequest) ([]byte, error) {
+	return c.Synthesize(ctx, req.Text, req.LanguageCode, req.VoiceName, req.AudioEncoding)
+}
+
+func (c *Client) DefaultVoice(langCode string) string {
+	if langCode == "en-US" {
+		return "en-US-Neural2-F"
+	}
+	return ""
+}
+
 func (c *Client) Synthesize(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
 	var reqBody synthesizeRequest
 	reqBody.Input.Text = text

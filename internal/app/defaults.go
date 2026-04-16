@@ -18,12 +18,31 @@ func resolveRunDefaults(cfg cli.Config, defaults config.Defaults) cli.Config {
 	return cfg
 }
 
+// resolveProfileDefaults applies profile defaults to the config when flags are not provided.
+func resolveProfileDefaults(cfg cli.Config, profile config.Profile) cli.Config {
+	if !cfg.HasVoiceFlag && profile.Defaults["voice"] != "" {
+		cfg.Voice = profile.Defaults["voice"]
+	}
+	if !cfg.HasLangFlag && profile.Defaults["lang"] != "" {
+		cfg.Lang = profile.Defaults["lang"]
+	}
+	return cfg
+}
+
 // resolveAPIKey prefers the environment variable over the saved API key.
 func resolveAPIKey(savedAPIKey string) string {
 	if envKey := strings.TrimSpace(lookupEnv(apiKeyEnvVar)); envKey != "" {
 		return envKey
 	}
 	return strings.TrimSpace(savedAPIKey)
+}
+
+// resolveProfileAPIKey extracts API key from profile credentials.
+func resolveProfileAPIKey(profile config.Profile) string {
+	if apiKey, ok := profile.Credentials["apiKey"].(string); ok {
+		return strings.TrimSpace(apiKey)
+	}
+	return ""
 }
 
 // defaultsEmpty reports whether all fields in Defaults are empty.
