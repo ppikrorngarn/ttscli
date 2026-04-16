@@ -56,7 +56,19 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
    ttscli --version
    ```
 
-2. **Or clone the repository and build the binary locally:**
+2. **Or download a pre-built binary from GitHub Releases:**
+
+   Each tagged release (matching `v*.*.*`) produces archives built by GoReleaser. The following combinations are published:
+
+   | OS      | Architectures | Archive format |
+   |---------|---------------|----------------|
+   | Linux   | amd64, arm64  | `.tar.gz`      |
+   | macOS   | amd64, arm64  | `.tar.gz`      |
+   | Windows | amd64, arm64  | `.zip`         |
+
+   A `checksums.txt` file is published alongside each release for verification. Extract the archive, place the `ttscli` binary somewhere on your `PATH`, and verify with `ttscli --version`.
+
+3. **Or clone the repository and build the binary locally:**
    You can use the provided Makefile to build the project easily:
    ```bash
    make build
@@ -88,7 +100,7 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
    ttscli --version
    ```
 
-3. **Run first-time setup (recommended):**
+4. **Run first-time setup (recommended):**
    ```bash
    ttscli setup
    ```
@@ -117,12 +129,25 @@ For contribution and licensing details, see:
 
 ### Development Checks
 
-Run these during development:
+The `Makefile` provides the following targets:
+
+| Target           | Description                                                       |
+|------------------|-------------------------------------------------------------------|
+| `make build`     | Build the `ttscli` binary with version metadata injected via ldflags |
+| `make clean`     | Remove the compiled binary and any `*.mp3` files                 |
+| `make run`       | Build and run the CLI (pass flags via `ARGS="..."`)              |
+| `make test`      | Run all tests with verbose output                                |
+| `make test-race` | Run all tests with the race detector                             |
+| `make tools`     | Install local developer tools (staticcheck)                      |
+| `make lint`      | Run static analysis (staticcheck)                                |
+| `make check`     | Run `go vet`, tests, race tests, and lint                        |
+| `make help`      | Print all available targets with their descriptions              |
+
+Quick examples:
 
 ```bash
-make test
-make test-race
-make lint
+make build
+make run ARGS="--version"
 make check
 ```
 
@@ -156,6 +181,49 @@ On Windows, the equivalent is typically `ttscli.exe` from a directory such as `%
 - 🚧 **Azure Speech**: Planned
 - 🚧 **IBM Watson**: Planned
 - 🚧 **Alibaba Cloud**: Planned
+
+### Configuration File
+
+`ttscli` stores its profiles in a JSON file. The CLI resolves the config path in two steps:
+
+1. **Next to the binary** — if a `config.json` sits in the same directory as the `ttscli` executable, it takes priority. Useful for portable or pinned setups.
+2. **User config directory (fallback):**
+
+| OS      | Path                                                 |
+|---------|------------------------------------------------------|
+| macOS   | `~/Library/Application Support/ttscli/config.json`   |
+| Linux   | `~/.config/ttscli/config.json`                       |
+| Windows | `%AppData%\ttscli\config.json`                       |
+
+**Config file format:**
+
+```json
+{
+  "activeProvider": "gcp",
+  "activeProfile": "default",
+  "profiles": {
+    "gcp:default": {
+      "provider": "gcp",
+      "name": "default",
+      "credentials": {
+        "apiKey": "YOUR_API_KEY"
+      },
+      "defaults": {
+        "lang": "en-US",
+        "voice": "en-US-Neural2-F"
+      }
+    }
+  }
+}
+```
+
+Prefer managing profiles via the `ttscli profile` subcommands (see [Command Reference](#command-reference)) rather than editing this file by hand.
+
+### Environment Variables
+
+| Variable         | Description                                                                                                                      |
+|------------------|----------------------------------------------------------------------------------------------------------------------------------|
+| `TTSCLI_PROFILE` | Overrides the active profile (e.g. `gcp:work`). Evaluated after `--profile` but before the active profile stored in the config. |
 
 ### Command Reference
 
@@ -301,4 +369,25 @@ ttscli voices
 ```bash
 ttscli voices --lang en-GB
 ```
+
+## Project Structure
+
+Module path: `github.com/ppikrorngarn/ttscli`
+
+The codebase is organized into a thin `cmd/` entry point and focused `internal/` packages:
+
+```
+cmd/ttscli/          Binary entry point. Injects version/commit/date via ldflags at build time.
+internal/cli/        Argument parsing. Owns the Config struct and all mode/subcommand constants.
+internal/app/        Command handlers (setup, doctor, profile, completion). Orchestrates the run
+                     flow: parse args -> resolve profile -> create provider -> execute.
+internal/config/     JSON config file I/O. Profile CRUD. Two-step path resolution (local next
+                     to the binary, falling back to the user config directory).
+internal/player/     Cross-platform audio playback. macOS: afplay. Linux: mpg123/paplay/ffplay.
+                     Windows: PowerShell Media.SoundPlayer.
+internal/tts/        Provider interface, GCP HTTP client, voice listing, PrintVoices helper.
+docs/                Documentation.
+```
+
+Packages under `internal/` use small, package-level function variables (e.g. `readFile`, `writeFile`, `lookupEnv`) for dependency injection, so tests can stub the filesystem, environment, and HTTP calls without real I/O.
 
