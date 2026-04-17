@@ -21,7 +21,6 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 
 	fmt.Fprintln(stdout, "Welcome to ttscli setup.")
 	fmt.Fprintln(stdout, "This will create a new GCP profile for text-to-speech.")
-	fmt.Fprintln(stdout)
 
 	profileName := "default"
 	profileKey := "gcp:" + profileName
@@ -43,8 +42,7 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 		}
 	}
 
-	fmt.Fprintln(stdout)
-	fmt.Fprintf(stdout, "Press Enter on language/voice to use built-in defaults: %s / %s.\n", cli.DefaultLanguage, cli.DefaultVoice)
+	fmt.Fprintf(stdout, "Press Enter on language/voice to use built-in defaults (%s / %s).\n", cli.DefaultLanguage, cli.DefaultVoice)
 
 	inputAPIKey, err := promptLine(reader, stdout, "Google Cloud API key: ")
 	if err != nil {
@@ -55,7 +53,7 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 		return fmt.Errorf("api key is required")
 	}
 
-	inputLang, err := promptLine(reader, stdout, fmt.Sprintf("Default language [%s] (press Enter to use default): ", cli.DefaultLanguage))
+	inputLang, err := promptLine(reader, stdout, fmt.Sprintf("Default language [%s]: ", cli.DefaultLanguage))
 	if err != nil {
 		return fmt.Errorf("read language: %w", err)
 	}
@@ -64,7 +62,7 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 		lang = cli.DefaultLanguage
 	}
 
-	inputVoice, err := promptLine(reader, stdout, fmt.Sprintf("Default voice [%s] (press Enter to use default): ", cli.DefaultVoice))
+	inputVoice, err := promptLine(reader, stdout, fmt.Sprintf("Default voice [%s]: ", cli.DefaultVoice))
 	if err != nil {
 		return fmt.Errorf("read voice: %w", err)
 	}
@@ -139,12 +137,13 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("resolve config path: %w", err)
 	}
-	fmt.Fprintln(stdout)
-	fmt.Fprintln(stdout, "Setup complete.")
+	fmt.Fprintln(stdout, "Setup complete!")
 	fmt.Fprintf(stdout, "Created profile: %s\n", profileKey)
-	fmt.Fprintf(stdout, "Profile settings: voice=%s lang=%s apiKey=%s\n", voice, lang, maskAPIKey(apiKey))
+	fmt.Fprintf(stdout, "  Voice: %s\n", voice)
+	fmt.Fprintf(stdout, "  Language: %s\n", lang)
+	fmt.Fprintf(stdout, "  API Key: %s\n", maskAPIKey(apiKey))
 	if appCfg.ActiveProvider == "gcp" && appCfg.ActiveProfile == profileName {
-		fmt.Fprintf(stdout, "Profile set as active.\n")
+		fmt.Fprintln(stdout, "Profile set as active.")
 	}
 	fmt.Fprintf(stdout, "Config file: %s\n", cfgPath)
 	return nil

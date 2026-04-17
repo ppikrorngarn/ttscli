@@ -37,8 +37,8 @@ func TestRunSetupCommandSuccess(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "Setup complete.") {
-		t.Errorf("expected setup complete message, got: %q", out)
+	if !strings.Contains(out, "Setup complete!") {
+		t.Errorf("expected setup complete! message, got: %q", out)
 	}
 	if !strings.Contains(out, "Created profile: gcp:default") {
 		t.Errorf("expected profile creation message, got: %q", out)
