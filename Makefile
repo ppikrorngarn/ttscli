@@ -1,4 +1,4 @@
-.PHONY: all build clean run test test-race lint check help
+.PHONY: all build clean run test test-race tools lint check help
 
 # The name of the binary
 BINARY_NAME=ttscli
@@ -6,6 +6,7 @@ VERSION ?= dev
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS := -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
+STATICCHECK ?= $(shell command -v staticcheck || echo $(shell go env GOPATH)/bin/staticcheck)
 
 all: build
 
@@ -32,16 +33,20 @@ test:
 test-race:
 	@go test -race ./...
 
+## tools: Install local developer tools
+tools:
+	@go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
+
 ## lint: Run static analysis checks
 lint:
-	@staticcheck ./...
+	@$(STATICCHECK) ./...
 
 ## check: Run vet, tests, race tests, and lint
 check:
 	@go vet ./...
 	@go test ./...
 	@go test -race ./...
-	@staticcheck ./...
+	@$(STATICCHECK) ./...
 
 ## help: Show this help message
 help:

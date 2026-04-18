@@ -38,10 +38,10 @@ jobs:
         run: go test -race ./...
 
       - name: Install staticcheck
-        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+        run: go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
 
       - name: Staticcheck
-        run: staticcheck ./...
+        run: $(go env GOPATH)/bin/staticcheck ./...
 
       - name: Build
         run: go build -o ttscli ./cmd/ttscli
