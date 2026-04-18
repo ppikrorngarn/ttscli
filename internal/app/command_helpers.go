@@ -42,7 +42,7 @@ func promptYesNo(reader *bufio.Reader, stdout io.Writer, prompt string, defaultY
 		case "n", "no":
 			return false, nil
 		default:
-			fmt.Fprintln(stdout, "Please answer y or n.")
+			fmt.Fprintln(stdout, "Please enter 'y' for yes or 'n' for no.")
 		}
 	}
 }

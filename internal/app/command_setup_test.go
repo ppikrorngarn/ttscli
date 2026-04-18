@@ -55,7 +55,7 @@ func TestRunSetupCommandEmptyAPIKey(t *testing.T) {
 	setupInput = strings.NewReader("\n") // empty API key
 
 	err := runSetupCommand(&bytes.Buffer{}, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "api key is required") {
+	if err == nil || !strings.Contains(err.Error(), "API key is required") {
 		t.Fatalf("expected api key required error, got: %v", err)
 	}
 }
