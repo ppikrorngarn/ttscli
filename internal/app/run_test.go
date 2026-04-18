@@ -350,6 +350,89 @@ func TestRunCallsContextStop(t *testing.T) {
 	}
 }
 
+func TestRunEndToEndFlowWithRealParseArgs(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	// Use real CLI parsing to validate package wiring.
+	parseArgs = cli.ParseArgs
+	loadDotenv = func(...string) error { return nil }
+	lookupEnv = func(_ string) string { return "k" }
+	newAppCtx = func() (context.Context, context.CancelFunc) {
+		return context.Background(), func() {}
+	}
+
+	var gotText, gotLang, gotVoice, gotEncoding string
+	newTTSClient = func(apiKey string) ttsService {
+		if apiKey != "k" {
+			t.Fatalf("unexpected api key: %q", apiKey)
+		}
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, langCode string) ([]tts.Voice, error) {
+				t.Fatal("ListVoices should not be called")
+				return nil, nil
+			},
+			synthesizeFn: func(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
+				gotText = text
+				gotLang = languageCode
+				gotVoice = voiceName
+				gotEncoding = audioEncoding
+				return []byte("audio"), nil
+			},
+		}
+	}
+
+	saved := false
+	writeFile = func(name string, data []byte, perm fs.FileMode) error {
+		saved = true
+		if name != "out.mp3" {
+			t.Fatalf("unexpected save path: %q", name)
+		}
+		if string(data) != "audio" {
+			t.Fatalf("unexpected save payload: %q", string(data))
+		}
+		return nil
+	}
+
+	played := false
+	playAudio = func(audioBytes []byte, stdout, stderr io.Writer) error {
+		played = true
+		if string(audioBytes) != "audio" {
+			t.Fatalf("unexpected play payload: %q", string(audioBytes))
+		}
+		return nil
+	}
+
+	var stdout bytes.Buffer
+	err := Run([]string{
+		"--text", "hello world",
+		"--lang", "en-GB",
+		"--voice", "en-GB-Neural2-B",
+		"--save", "out.mp3",
+		"--play",
+	}, &stdout, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	if gotText != "hello world" || gotLang != "en-GB" || gotVoice != "en-GB-Neural2-B" {
+		t.Fatalf("unexpected synth inputs: text=%q lang=%q voice=%q", gotText, gotLang, gotVoice)
+	}
+	if gotEncoding != tts.AudioEncodingMP3 {
+		t.Fatalf("unexpected encoding: %q", gotEncoding)
+	}
+	if !saved || !played {
+		t.Fatalf("expected saved and played, got saved=%v played=%v", saved, played)
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, "Synthesizing speech...") ||
+		!strings.Contains(out, "Saved audio to: out.mp3") ||
+		!strings.Contains(out, "Playing audio...") {
+		t.Fatalf("unexpected stdout: %q", out)
+	}
+}
+
 func stubAppDeps() func() {
 	oldParseArgs := parseArgs
 	oldLoadDotenv := loadDotenv
