@@ -12,6 +12,8 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
    - Create an API Key and restrict it to the "Cloud Text-to-Speech API".
 3. **Audio Player (Linux Only):** If you are running on Linux and want to use the `--play` flag, you need an audio player installed. The CLI looks for `mpg123`, `paplay`, or `ffplay`.
    - Ubuntu/Debian: `sudo apt install mpg123`
+4. **Staticcheck (for local quality checks):** Optional but recommended for contributors.
+   - Install: `go install honnef.co/go/tools/cmd/staticcheck@latest`
 
 ## Setup
 
@@ -39,6 +41,11 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
 You can run the CLI by executing the `./ttscli` binary. 
 
 ### Basic Commands
+
+**0. Show CLI version/build metadata:**
+```bash
+./ttscli --version
+```
 
 **1. Play audio immediately (without saving):**
 ```bash
@@ -94,8 +101,19 @@ For a full list of flags, use the `--help` command:
 
 A `Makefile` is included to simplify common development tasks.
 
-- `make build` - Compiles the Go binary into `ttscli`.
+- `make build` - Compiles the Go binary into `ttscli` with version metadata (`VERSION`, `COMMIT`, `DATE`).
 - `make clean` - Removes the compiled binary and any generated `.mp3` files in the directory.
 - `make run ARGS="..."` - Builds and runs the CLI, passing arguments to it (e.g., `make run ARGS="--list-voices"`).
 - `make test` - Runs Go tests.
+- `make test-race` - Runs tests with the race detector.
+- `make lint` - Runs `staticcheck`.
+- `make check` - Runs `go vet`, tests, race tests, and `staticcheck`.
 - `make help` - Displays a list of all available make commands.
+
+### Build Metadata Example
+
+To build a release-like binary with explicit metadata:
+
+```bash
+make build VERSION=v0.1.0 COMMIT=$(git rev-parse --short HEAD) DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+```
