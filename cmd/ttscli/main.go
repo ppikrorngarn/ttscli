@@ -36,7 +36,9 @@ func runMain(args []string, stdout, stderr io.Writer) int {
 	if errors.Is(err, flag.ErrHelp) {
 		return 0
 	}
-	fmt.Fprintln(stderr, "Error:", err)
+	fmt.Fprintln(stderr, "Error: "+err.Error())
+	fmt.Fprintln(stderr)
+	fmt.Fprintln(stderr, "Run 'ttscli --help' for usage information.")
 	return 1
 }
 

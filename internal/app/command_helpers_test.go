@@ -97,7 +97,7 @@ func TestPromptYesNoInvalidThenValid(t *testing.T) {
 	if err != nil || !got {
 		t.Fatalf("expected true after retry, got %v (err: %v)", got, err)
 	}
-	if !strings.Contains(stdout.String(), "Please answer y or n.") {
+	if !strings.Contains(stdout.String(), "Please enter 'y' for yes or 'n' for no.") {
 		t.Error("expected retry message to be printed")
 	}
 }
