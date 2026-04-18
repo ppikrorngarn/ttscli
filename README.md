@@ -36,6 +36,16 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
    ```
    *(Alternatively, you can export it in your terminal: `export TTSCLI_GOOGLE_API_KEY="your_api_key_here"`)*
 
+### Contributor Setup
+
+For local quality checks:
+
+```bash
+make tools
+export PATH="$(go env GOPATH)/bin:$PATH"
+make check
+```
+
 ## Usage
 
 You can run the CLI by executing the `./ttscli` binary. 
@@ -142,6 +152,7 @@ A `Makefile` is included to simplify common development tasks.
 - `make run ARGS="..."` - Builds and runs the CLI, passing arguments to it (e.g., `make run ARGS="--list-voices"`).
 - `make test` - Runs Go tests.
 - `make test-race` - Runs tests with the race detector.
+- `make tools` - Installs pinned local developer tools (currently `staticcheck`).
 - `make lint` - Runs `staticcheck`.
 - `make check` - Runs `go vet`, tests, race tests, and `staticcheck`.
 - `make help` - Displays a list of all available make commands.
