@@ -15,7 +15,7 @@ func TestCheckPlaybackCapabilityDarwinFound(t *testing.T) {
 	check := checkPlaybackCapability("darwin", func(f string) (string, error) {
 		return "/usr/bin/" + f, nil
 	})
-	if !check.ok || check.detail != "found afplay" {
+	if !check.ok || check.detail != "afplay found" {
 		t.Errorf("expected ok with afplay, got %+v", check)
 	}
 }
@@ -39,7 +39,7 @@ func TestCheckPlaybackCapabilityLinuxPrefersMpg123(t *testing.T) {
 		}
 		return "", errors.New("missing")
 	})
-	if !check.ok || check.detail != "found mpg123" {
+	if !check.ok || check.detail != "mpg123 found" {
 		t.Errorf("expected ok with mpg123, got %+v", check)
 	}
 }
@@ -51,7 +51,7 @@ func TestCheckPlaybackCapabilityLinuxFallbackPaplay(t *testing.T) {
 		}
 		return "", errors.New("missing")
 	})
-	if !check.ok || check.detail != "found paplay" {
+	if !check.ok || check.detail != "paplay found" {
 		t.Errorf("expected ok with paplay, got %+v", check)
 	}
 }
@@ -63,7 +63,7 @@ func TestCheckPlaybackCapabilityLinuxFallbackFfplay(t *testing.T) {
 		}
 		return "", errors.New("missing")
 	})
-	if !check.ok || check.detail != "found ffplay" {
+	if !check.ok || check.detail != "ffplay found" {
 		t.Errorf("expected ok with ffplay, got %+v", check)
 	}
 }
@@ -84,7 +84,7 @@ func TestCheckPlaybackCapabilityWindowsFound(t *testing.T) {
 		}
 		return "", errors.New("missing")
 	})
-	if !check.ok || check.detail != "found powershell" {
+	if !check.ok || check.detail != "PowerShell found" {
 		t.Errorf("expected ok with powershell, got %+v", check)
 	}
 }
@@ -120,8 +120,11 @@ func TestPrintDoctorChecksAllPass(t *testing.T) {
 	if failed != 0 {
 		t.Errorf("expected 0 failed, got %d", failed)
 	}
-	if strings.Contains(stdout.String(), "[FAIL]") {
-		t.Error("expected no FAIL in output")
+	if strings.Contains(stdout.String(), "✗") {
+		t.Error("expected no ✗ in output")
+	}
+	if !strings.Contains(stdout.String(), "✓") {
+		t.Error("expected ✓ in output")
 	}
 }
 
@@ -136,8 +139,11 @@ func TestPrintDoctorChecksSomeFail(t *testing.T) {
 		t.Errorf("expected 1 failed, got %d", failed)
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "[FAIL]") {
-		t.Error("expected FAIL in output")
+	if !strings.Contains(out, "✗") {
+		t.Error("expected ✗ in output")
+	}
+	if !strings.Contains(out, "✓") {
+		t.Error("expected ✓ in output")
 	}
 	if !strings.Contains(out, "fix it") {
 		t.Error("expected hint in output")
@@ -187,8 +193,8 @@ func TestRunDoctorCommandNoProfiles(t *testing.T) {
 		t.Fatal("expected error when no profiles configured")
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "Doctor result: FAIL") {
-		t.Errorf("expected FAIL result, got: %q", out)
+	if !strings.Contains(out, "✗") {
+		t.Errorf("expected ✗ in result, got: %q", out)
 	}
 	if !strings.Contains(out, "no profiles configured") {
 		t.Errorf("expected no profiles message, got: %q", out)
@@ -217,7 +223,7 @@ func TestRunDoctorCommandAPIConnectivityFail(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when API fails")
 	}
-	if !strings.Contains(stdout.String(), "[FAIL] API connectivity") {
+	if !strings.Contains(stdout.String(), "✗") || !strings.Contains(stdout.String(), "API connectivity") {
 		t.Errorf("expected API connectivity failure, got: %q", stdout.String())
 	}
 }
@@ -241,7 +247,7 @@ func TestRunDoctorCommandNoActiveProfile(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when no active profile set")
 	}
-	if !strings.Contains(stdout.String(), "no active profile set") {
+	if !strings.Contains(stdout.String(), "No active profile set") {
 		t.Errorf("expected no active profile message, got: %q", stdout.String())
 	}
 }

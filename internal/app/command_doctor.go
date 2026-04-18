@@ -24,13 +24,13 @@ func runDoctorCommand(stdout io.Writer) error {
 			name:   "Config file",
 			ok:     false,
 			detail: err.Error(),
-			hint:   "Check config file permissions and location.",
+			hint:   "Check that the config file exists and has proper read permissions.",
 		})
 	} else {
 		checks = append(checks, doctorCheck{
 			name:   "Config file",
 			ok:     true,
-			detail: "config file is readable",
+			detail: "Configuration file found and readable",
 		})
 	}
 
@@ -38,20 +38,20 @@ func runDoctorCommand(stdout io.Writer) error {
 		checks = append(checks, doctorCheck{
 			name:   "Profiles",
 			ok:     false,
-			detail: "no profiles configured",
-			hint:   "Run \"ttscli setup\" to create a profile.",
+			detail: "No profiles configured",
+			hint:   "Run \"ttscli setup\" for interactive setup or \"ttscli profile create\" to add a profile.",
 		})
 		checks = append(checks, doctorCheck{
 			name:   "Active profile",
 			ok:     false,
-			detail: "no active profile set",
-			hint:   "Run \"ttscli profile use <provider:name>\" to set an active profile.",
+			detail: "No active profile set",
+			hint:   "Use \"ttscli profile use <provider:name>\" to set an active profile.",
 		})
 		checks = append(checks, doctorCheck{
 			name:   "API connectivity",
 			ok:     false,
-			detail: "skipped: no profiles configured",
-			hint:   "Create a profile first.",
+			detail: "Skipped (no profiles configured)",
+			hint:   "Create a profile first to test API connectivity.",
 		})
 	} else {
 		checks = append(checks, doctorCheck{
@@ -65,14 +65,14 @@ func runDoctorCommand(stdout io.Writer) error {
 			checks = append(checks, doctorCheck{
 				name:   "Active profile",
 				ok:     false,
-				detail: "no active profile set",
-				hint:   "Run \"ttscli profile use <provider:name>\" to set an active profile.",
+				detail: "No active profile set",
+				hint:   "Use \"ttscli profile use <provider:name>\" to select an active profile.",
 			})
 			checks = append(checks, doctorCheck{
 				name:   "API connectivity",
 				ok:     false,
-				detail: "skipped: no active profile",
-				hint:   "Set an active profile first.",
+				detail: "Skipped (no active profile)",
+				hint:   "Set an active profile first to test API connectivity.",
 			})
 		} else {
 			profile, profileErr := getProfile(appCfg, activeProfileKey)
@@ -81,13 +81,13 @@ func runDoctorCommand(stdout io.Writer) error {
 					name:   "Active profile",
 					ok:     false,
 					detail: profileErr.Error(),
-					hint:   "Run \"ttscli profile use <provider:name>\" to set a valid active profile.",
+					hint:   "Use \"ttscli profile use <provider:name>\" to select a valid profile.",
 				})
 				checks = append(checks, doctorCheck{
 					name:   "API connectivity",
 					ok:     false,
-					detail: "skipped: invalid active profile",
-					hint:   "Fix or change the active profile.",
+					detail: "Skipped (invalid active profile)",
+					hint:   "Fix or change the active profile first.",
 				})
 			} else {
 				checks = append(checks, doctorCheck{
@@ -102,12 +102,12 @@ func runDoctorCommand(stdout io.Writer) error {
 						name:   "Provider initialization",
 						ok:     false,
 						detail: providerErr.Error(),
-						hint:   "Check profile credentials and configuration.",
+						hint:   "Check the profile credentials and configuration.",
 					})
 					checks = append(checks, doctorCheck{
 						name:   "API connectivity",
 						ok:     false,
-						detail: "skipped: provider initialization failed",
+						detail: "Skipped (provider initialization failed)",
 						hint:   "Fix provider initialization errors first.",
 					})
 				} else {
@@ -129,20 +129,20 @@ func runDoctorCommand(stdout io.Writer) error {
 							name:   "API connectivity",
 							ok:     false,
 							detail: err.Error(),
-							hint:   "Verify API key, permissions, and service enablement.",
+							hint:   "Verify your API key, permissions, and that the TTS service is enabled.",
 						})
 					} else if len(voices) == 0 {
 						checks = append(checks, doctorCheck{
 							name:   "API connectivity",
 							ok:     false,
-							detail: "connected but returned no voices",
-							hint:   "Check API permissions and account/project status.",
+							detail: "Connected but no voices returned",
+							hint:   "Check API permissions and account/project status in your cloud console.",
 						})
 					} else {
 						checks = append(checks, doctorCheck{
 							name:   "API connectivity",
 							ok:     true,
-							detail: fmt.Sprintf("successfully listed %d voices for %s", len(voices), testLang),
+							detail: fmt.Sprintf("Successfully listed %d voices for %s", len(voices), testLang),
 						})
 					}
 				}
@@ -155,11 +155,11 @@ func runDoctorCommand(stdout io.Writer) error {
 
 	failed := printDoctorChecks(stdout, checks)
 	if failed > 0 {
-		fmt.Fprintf(stdout, "Doctor result: FAIL (%d failed)\n", failed)
+		fmt.Fprintf(stdout, "\n✗ Doctor result: FAIL (%d check(s) failed)\n", failed)
 		return fmt.Errorf("doctor failed with %d check(s)", failed)
 	}
 
-	fmt.Fprintln(stdout, "Doctor result: OK")
+	fmt.Fprintln(stdout, "\n✓ Doctor result: OK - All checks passed")
 	return nil
 }
 
@@ -170,26 +170,26 @@ func checkPlaybackCapability(goos string, lookPath func(file string) (string, er
 			return doctorCheck{
 				name:   "Audio playback",
 				ok:     false,
-				detail: "required player command \"afplay\" not found",
-				hint:   "Install command-line audio playback support for macOS.",
+				detail: "afplay command not found",
+				hint:   "macOS should include afplay by default. Check your system installation.",
 			}
 		}
-		return doctorCheck{name: "Audio playback", ok: true, detail: "found afplay"}
+		return doctorCheck{name: "Audio playback", ok: true, detail: "afplay found"}
 	case "linux":
 		if _, err := lookPath("mpg123"); err == nil {
-			return doctorCheck{name: "Audio playback", ok: true, detail: "found mpg123"}
+			return doctorCheck{name: "Audio playback", ok: true, detail: "mpg123 found"}
 		}
 		if _, err := lookPath("paplay"); err == nil {
-			return doctorCheck{name: "Audio playback", ok: true, detail: "found paplay"}
+			return doctorCheck{name: "Audio playback", ok: true, detail: "paplay found"}
 		}
 		if _, err := lookPath("ffplay"); err == nil {
-			return doctorCheck{name: "Audio playback", ok: true, detail: "found ffplay"}
+			return doctorCheck{name: "Audio playback", ok: true, detail: "ffplay found"}
 		}
 		return doctorCheck{
 			name:   "Audio playback",
 			ok:     false,
-			detail: "no supported player found (mpg123, paplay, ffplay)",
-			hint:   "Install mpg123 (for example: sudo apt install mpg123).",
+			detail: "No supported player found (requires mpg123, paplay, or ffplay)",
+			hint:   "Install a player: sudo apt install mpg123 (Debian/Ubuntu) or sudo dnf install mpg123 (Fedora)",
 		}
 	case "windows":
 		if _, err := lookPath("powershell"); err != nil {
@@ -197,34 +197,37 @@ func checkPlaybackCapability(goos string, lookPath func(file string) (string, er
 				return doctorCheck{
 					name:   "Audio playback",
 					ok:     false,
-					detail: "required player command \"powershell\" not found",
-					hint:   "Ensure PowerShell is available in PATH.",
+					detail: "PowerShell not found",
+					hint:   "Ensure PowerShell is available in your PATH.",
 				}
 			}
 		}
-		return doctorCheck{name: "Audio playback", ok: true, detail: "found powershell"}
+		return doctorCheck{name: "Audio playback", ok: true, detail: "PowerShell found"}
 	default:
 		return doctorCheck{
 			name:   "Audio playback",
 			ok:     false,
-			detail: fmt.Sprintf("unsupported platform: %s", goos),
+			detail: fmt.Sprintf("Unsupported platform: %s", goos),
 			hint:   "Audio playback is supported on macOS, Linux, and Windows.",
 		}
 	}
 }
 
 func printDoctorChecks(stdout io.Writer, checks []doctorCheck) int {
-	fmt.Fprintln(stdout, "Running doctor checks...")
+	fmt.Fprintln(stdout, "Running diagnostics...")
+	fmt.Fprintln(stdout)
 	failed := 0
 	for _, check := range checks {
-		status := "PASS"
 		if !check.ok {
-			status = "FAIL"
 			failed++
 		}
-		fmt.Fprintf(stdout, "[%s] %s: %s\n", status, check.name, check.detail)
+		status := "✓"
+		if !check.ok {
+			status = "✗"
+		}
+		fmt.Fprintf(stdout, "  [%s] %s: %s\n", status, check.name, check.detail)
 		if !check.ok && strings.TrimSpace(check.hint) != "" {
-			fmt.Fprintf(stdout, "  fix: %s\n", check.hint)
+			fmt.Fprintf(stdout, "       → %s\n", check.hint)
 		}
 	}
 	return failed
