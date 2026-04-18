@@ -35,6 +35,9 @@ Use conventional-style prefixes where possible:
 - `refactor:` for structure/maintainability
 - `test:` for test-only changes
 - `docs:` for documentation updates
+- `perf:` for performance improvements (e.g., latency, memory usage)
+- `style:` for code style or formatting changes
+- `ci:` for CI/CD configuration updates
 - `chore:` for tooling/automation changes
 
 ## Release Process
