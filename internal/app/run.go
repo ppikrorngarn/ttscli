@@ -30,7 +30,7 @@ func Run(args []string, stdout, stderr io.Writer) error {
 	case cli.ModeSpeak, cli.ModeSave, cli.ModeVoices:
 		// Continue with synth/list flow below.
 	default:
-		return fmt.Errorf("unsupported mode: %s", cfg.Mode)
+		return fmt.Errorf("unsupported mode: %s. Run 'ttscli --help' for available commands", cfg.Mode)
 	}
 
 	// Load profile-based config
@@ -90,14 +90,14 @@ func runWithProvider(cfg cli.Config, provider tts.Provider, stdout, stderr io.Wr
 	}
 	audioBytes, err := provider.SynthesizeRequest(ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to synthesize: %w", err)
+		return fmt.Errorf("failed to synthesize speech: %w", err)
 	}
 
 	if cfg.SavePath != "" {
 		if err := writeFile(cfg.SavePath, audioBytes, 0o644); err != nil {
-			return fmt.Errorf("failed to save file: %w", err)
+			return fmt.Errorf("failed to save audio file: %w", err)
 		}
-		fmt.Fprintf(stdout, "Saved audio to: %s\n", cfg.SavePath)
+		fmt.Fprintf(stdout, "✓ Saved audio to: %s\n", cfg.SavePath)
 	}
 
 	if cfg.Play {
@@ -105,6 +105,7 @@ func runWithProvider(cfg cli.Config, provider tts.Provider, stdout, stderr io.Wr
 		if err := playAudio(audioBytes, stdout, stderr); err != nil {
 			return fmt.Errorf("failed to play audio: %w", err)
 		}
+		fmt.Fprintln(stdout, "Playback complete.")
 	}
 
 	return nil
