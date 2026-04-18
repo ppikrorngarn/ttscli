@@ -33,17 +33,22 @@ func runProfileList(stdout io.Writer) error {
 	}
 
 	if len(appCfg.Profiles) == 0 {
-		fmt.Fprintln(stdout, "No profiles found. Create one with: ttscli profile create")
+		fmt.Fprintln(stdout, "No profiles configured yet.")
+		fmt.Fprintln(stdout)
+		fmt.Fprintln(stdout, "Create your first profile with one of these commands:")
+		fmt.Fprintln(stdout, "  ttscli setup                              # Interactive setup wizard")
+		fmt.Fprintln(stdout, "  ttscli profile create --provider gcp --name default --api-key YOUR_KEY")
 		return nil
 	}
 
-	fmt.Fprintln(stdout, "Available profiles:")
-	fmt.Fprintln(stdout, "PROFILE KEY   | PROVIDER | NAME    | DEFAULT VOICE | DEFAULT LANG")
-	fmt.Fprintln(stdout, "-------------------------------------------------------------------")
+	fmt.Fprintln(stdout, "Configured profiles:")
+	fmt.Fprintln(stdout)
+	fmt.Fprintln(stdout, "PROFILE KEY      PROVIDER   NAME       DEFAULT VOICE        LANG")
+	fmt.Fprintln(stdout, "──────────────── ───────── ───────── ───────────────────── ────────")
 	for key, profile := range appCfg.Profiles {
 		isActive := ""
 		if profile.Provider == appCfg.ActiveProvider && profile.Name == appCfg.ActiveProfile {
-			isActive = " (active)"
+			isActive = " ✓"
 		}
 		defaultVoice := profile.Defaults["voice"]
 		if defaultVoice == "" {
@@ -53,21 +58,29 @@ func runProfileList(stdout io.Writer) error {
 		if defaultLang == "" {
 			defaultLang = "(not set)"
 		}
-		fmt.Fprintf(stdout, "%-13s | %-8s | %-7s | %-13s | %s%s\n",
+		fmt.Fprintf(stdout, "%-16s %-9s %-9s %-21s %-8s%s\n",
 			key, profile.Provider, profile.Name, defaultVoice, defaultLang, isActive)
 	}
+	fmt.Fprintln(stdout)
+	fmt.Fprintln(stdout, "Legend: ✓ = active profile")
+	fmt.Fprintln(stdout)
+	fmt.Fprintln(stdout, "Manage profiles:")
+	fmt.Fprintln(stdout, "  ttscli profile create --provider <provider> --name <name> --api-key <key>")
+	fmt.Fprintln(stdout, "  ttscli profile use <provider:name>")
+	fmt.Fprintln(stdout, "  ttscli profile get <provider:name>")
+	fmt.Fprintln(stdout, "  ttscli profile delete <provider:name>")
 	return nil
 }
 
 func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
 	if cfg.Lang == "" {
-		return fmt.Errorf("--provider is required")
+		return fmt.Errorf("--provider is required. Specify the TTS provider (gcp, aws, azure, ibm, alibaba)")
 	}
 	if cfg.Voice == "" {
-		return fmt.Errorf("--name is required")
+		return fmt.Errorf("--name is required. Choose a unique name for this profile")
 	}
 	if cfg.APIKey == "" {
-		return fmt.Errorf("--api-key is required")
+		return fmt.Errorf("--api-key is required. Get your API key from the provider's console")
 	}
 
 	appCfg, err := loadConfig()
@@ -77,7 +90,7 @@ func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
 
 	profileKey := cfg.Lang + ":" + cfg.Voice
 	if _, exists := appCfg.Profiles[profileKey]; exists {
-		return fmt.Errorf("profile %q already exists", profileKey)
+		return fmt.Errorf("profile '%s' already exists. Choose a different name or delete it first", profileKey)
 	}
 
 	profile := config.Profile{
@@ -93,6 +106,8 @@ func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
 		profile.Defaults["voice"] = cfg.SavePath
 	}
 
+	fmt.Fprintln(stdout, "Validating provider credentials...")
+
 	provider, err := newProvider(profile)
 	if err != nil {
 		return fmt.Errorf("create provider: %w", err)
@@ -106,7 +121,7 @@ func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
 		return fmt.Errorf("validate provider: %w", err)
 	}
 	if len(voices) == 0 {
-		return fmt.Errorf("provider returned no voices, validation failed")
+		return fmt.Errorf("provider returned no voices. Please check your API key and permissions")
 	}
 
 	appCfg.Profiles[profileKey] = profile
@@ -119,10 +134,15 @@ func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
 		return fmt.Errorf("save config: %w", err)
 	}
 
-	fmt.Fprintf(stdout, "Profile created: %s\n", profileKey)
+	fmt.Fprintln(stdout)
+	fmt.Fprintf(stdout, "✓ Profile created: %s\n", profileKey)
 	if profile.Provider == appCfg.ActiveProvider && profile.Name == appCfg.ActiveProfile {
-		fmt.Fprintf(stdout, "Profile set as active.\n")
+		fmt.Fprintf(stdout, "✓ Profile set as active.\n")
 	}
+	fmt.Fprintln(stdout)
+	fmt.Fprintln(stdout, "Usage:")
+	fmt.Fprintf(stdout, "  ttscli speak --text \"Hello\" --profile %s\n", profileKey)
+	fmt.Fprintf(stdout, "  ttscli profile use %s\n", profileKey)
 	return nil
 }
 
@@ -133,7 +153,7 @@ func runProfileDelete(cfg cli.Config, stdout io.Writer) error {
 	}
 
 	if _, exists := appCfg.Profiles[cfg.Profile]; !exists {
-		return fmt.Errorf("profile %q not found", cfg.Profile)
+		return fmt.Errorf("profile '%s' not found. Run 'ttscli profile list' to see available profiles", cfg.Profile)
 	}
 
 	delete(appCfg.Profiles, cfg.Profile)
@@ -156,7 +176,7 @@ func runProfileDelete(cfg cli.Config, stdout io.Writer) error {
 		return fmt.Errorf("save config: %w", err)
 	}
 
-	fmt.Fprintf(stdout, "Profile deleted: %s\n", cfg.Profile)
+	fmt.Fprintf(stdout, "✓ Profile deleted: %s\n", cfg.Profile)
 	return nil
 }
 
@@ -168,7 +188,7 @@ func runProfileUse(cfg cli.Config, stdout io.Writer) error {
 
 	parts := strings.Split(cfg.Profile, ":")
 	if len(parts) != 2 {
-		return fmt.Errorf("invalid profile key format, expected provider:name (e.g., gcp:default)")
+		return fmt.Errorf("invalid profile format. Expected 'provider:name' (e.g., gcp:default)")
 	}
 
 	provider := parts[0]
@@ -176,7 +196,7 @@ func runProfileUse(cfg cli.Config, stdout io.Writer) error {
 	profileKey := cfg.Profile
 
 	if _, exists := appCfg.Profiles[profileKey]; !exists {
-		return fmt.Errorf("profile %q not found", profileKey)
+		return fmt.Errorf("profile '%s' not found. Run 'ttscli profile list' to see available profiles", profileKey)
 	}
 
 	appCfg.ActiveProvider = provider
@@ -186,7 +206,11 @@ func runProfileUse(cfg cli.Config, stdout io.Writer) error {
 		return fmt.Errorf("save config: %w", err)
 	}
 
-	fmt.Fprintf(stdout, "Active profile set to: %s\n", profileKey)
+	fmt.Fprintf(stdout, "✓ Active profile set to: %s\n", profileKey)
+	fmt.Fprintln(stdout)
+	fmt.Fprintln(stdout, "You can now use TTS commands without specifying --profile:")
+	fmt.Fprintln(stdout, "  ttscli speak --text \"Hello world\"")
+	fmt.Fprintln(stdout, "  ttscli voices")
 	return nil
 }
 
@@ -201,10 +225,17 @@ func runProfileGet(cfg cli.Config, stdout io.Writer) error {
 		return err
 	}
 
-	fmt.Fprintf(stdout, "Profile: %s\n", cfg.Profile)
-	fmt.Fprintf(stdout, "Provider: %s\n", profile.Provider)
-	fmt.Fprintf(stdout, "Name: %s\n", profile.Name)
-	fmt.Fprintf(stdout, "API Key: %s\n", maskAPIKey(resolveProfileAPIKey(profile)))
+	isActive := ""
+	if profile.Provider == appCfg.ActiveProvider && profile.Name == appCfg.ActiveProfile {
+		isActive = " (active)"
+	}
+
+	fmt.Fprintln(stdout, "Profile Details")
+	fmt.Fprintln(stdout, "───────────────")
+	fmt.Fprintf(stdout, "Profile Key:   %s%s\n", cfg.Profile, isActive)
+	fmt.Fprintf(stdout, "Provider:      %s\n", profile.Provider)
+	fmt.Fprintf(stdout, "Name:          %s\n", profile.Name)
+	fmt.Fprintf(stdout, "API Key:       %s\n", maskAPIKey(resolveProfileAPIKey(profile)))
 	if voice, ok := profile.Defaults["voice"]; ok {
 		fmt.Fprintf(stdout, "Default Voice: %s\n", voice)
 	} else {
@@ -215,5 +246,9 @@ func runProfileGet(cfg cli.Config, stdout io.Writer) error {
 	} else {
 		fmt.Fprintln(stdout, "Default Language: (not set)")
 	}
+	fmt.Fprintln(stdout)
+	fmt.Fprintln(stdout, "Usage:")
+	fmt.Fprintf(stdout, "  ttscli speak --text \"Hello\" --profile %s\n", cfg.Profile)
+	fmt.Fprintf(stdout, "  ttscli save --text \"Hello\" --out speech.mp3 --profile %s\n", cfg.Profile)
 	return nil
 }

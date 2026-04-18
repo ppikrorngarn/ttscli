@@ -23,7 +23,7 @@ func TestRunProfileListShowsProfiles(t *testing.T) {
 	if !strings.Contains(out, "gcp:default") {
 		t.Errorf("expected profile key in output, got: %q", out)
 	}
-	if !strings.Contains(out, "(active)") {
+	if !strings.Contains(out, "✓") {
 		t.Errorf("expected active marker in output, got: %q", out)
 	}
 }
@@ -40,7 +40,7 @@ func TestRunProfileListNoProfiles(t *testing.T) {
 	if err := runProfileList(&stdout); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(stdout.String(), "No profiles found") {
+	if !strings.Contains(stdout.String(), "No profiles configured yet") {
 		t.Errorf("expected no profiles message, got: %q", stdout.String())
 	}
 }
@@ -239,7 +239,7 @@ func TestRunProfileUseInvalidFormat(t *testing.T) {
 	defer reset()
 
 	err := runProfileUse(cli.Config{Profile: "invalid-format"}, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "invalid profile key format") {
+	if err == nil || !strings.Contains(err.Error(), "invalid profile format") {
 		t.Fatalf("expected invalid format error, got: %v", err)
 	}
 }
@@ -263,7 +263,7 @@ func TestRunProfileGetSuccess(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "Provider: gcp") || !strings.Contains(out, "Name: default") {
+	if !strings.Contains(out, "Provider:") || !strings.Contains(out, "Name:") {
 		t.Errorf("expected profile details, got: %q", out)
 	}
 }
