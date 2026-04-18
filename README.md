@@ -173,3 +173,14 @@ Sample version output:
 ```
 
 Without explicit build metadata, local binaries show defaults (`version=dev`, `commit=none`, `date=unknown`).
+
+## Releases
+
+- Pushing a tag like `v0.1.0` triggers automated multi-platform releases via GitHub Actions + GoReleaser.
+- Artifacts are built for Linux, macOS, and Windows.
+- Release binaries include embedded version metadata visible from `--version`.
+
+## Project Policies
+
+- License: [LICENSE](./LICENSE)
+- Contributing guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
