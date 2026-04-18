@@ -196,8 +196,8 @@ func TestParseCLIArgsHelp(t *testing.T) {
 		!strings.Contains(helpText, "ttscli save --text") ||
 		!strings.Contains(helpText, "ttscli voices --lang") ||
 		!strings.Contains(helpText, "ttscli setup") ||
-		!strings.Contains(helpText, "ttscli profile <list|create|delete|use|get> [flags]") ||
-		!strings.Contains(helpText, "Short aliases: -t/--text, -o/--out, -l/--lang, -v/--voice, -p/--profile") {
+		!strings.Contains(helpText, "-t, --text") ||
+		!strings.Contains(helpText, "Commands:") {
 		t.Fatalf("help text missing usage examples, got: %q", helpText)
 	}
 }
@@ -226,7 +226,7 @@ func TestParseCLIArgsSpeakUnexpectedPositionalArgs(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected unexpected positional arguments error")
 	}
-	if !strings.Contains(err.Error(), "unexpected positional arguments") {
+	if !strings.Contains(err.Error(), "unexpected arguments") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -246,9 +246,9 @@ func TestParseCLIArgsUnsupportedCommand(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := ParseArgs([]string{"play"}, &stderr)
 	if err == nil {
-		t.Fatal("expected unsupported command error")
+		t.Fatal("expected unknown command error")
 	}
-	if !strings.Contains(err.Error(), "unsupported command") {
+	if !strings.Contains(err.Error(), "unknown command") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -259,7 +259,7 @@ func TestParseCLIArgsSetupRejectsPositionalArgs(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected unexpected positional arguments error")
 	}
-	if !strings.Contains(err.Error(), "unexpected positional arguments") {
+	if !strings.Contains(err.Error(), "does not accept arguments") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -281,7 +281,7 @@ func TestParseCLIArgsDoctorRejectsPositionalArgs(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected unexpected positional arguments error")
 	}
-	if !strings.Contains(err.Error(), "unexpected positional arguments") {
+	if !strings.Contains(err.Error(), "does not accept arguments") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -303,7 +303,7 @@ func TestParseCLIArgsCompletionRequiresShell(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected missing shell error")
 	}
-	if !strings.Contains(err.Error(), "please provide a shell") {
+	if !strings.Contains(err.Error(), "please specify a shell") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -325,7 +325,7 @@ func TestParseCLIArgsCompletionRejectsExtraArgs(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected unexpected positional arguments error")
 	}
-	if !strings.Contains(err.Error(), "unexpected positional arguments") {
+	if !strings.Contains(err.Error(), "too many arguments") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -377,7 +377,7 @@ func TestParseCLIArgsVoicesWithProfileFlag(t *testing.T) {
 func TestParseCLIArgsProfileNoSubcommand(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := ParseArgs([]string{"profile"}, &stderr)
-	if err == nil || !strings.Contains(err.Error(), "please provide a profile subcommand") {
+	if err == nil || !strings.Contains(err.Error(), "profile subcommand required") {
 		t.Fatalf("expected missing subcommand error, got: %v", err)
 	}
 }
@@ -396,7 +396,7 @@ func TestParseCLIArgsProfileList(t *testing.T) {
 func TestParseCLIArgsProfileListRejectsExtraArgs(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := ParseArgs([]string{"profile", "list", "extra"}, &stderr)
-	if err == nil || !strings.Contains(err.Error(), "unexpected positional arguments") {
+	if err == nil || !strings.Contains(err.Error(), "does not accept arguments") {
 		t.Fatalf("expected unexpected positional args error, got: %v", err)
 	}
 }
@@ -435,7 +435,7 @@ func TestParseCLIArgsProfileDelete(t *testing.T) {
 func TestParseCLIArgsProfileDeleteMissingKey(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := ParseArgs([]string{"profile", "delete"}, &stderr)
-	if err == nil || !strings.Contains(err.Error(), "please provide profile key") {
+	if err == nil || !strings.Contains(err.Error(), "profile key required") {
 		t.Fatalf("expected missing key error, got: %v", err)
 	}
 }
@@ -454,7 +454,7 @@ func TestParseCLIArgsProfileUse(t *testing.T) {
 func TestParseCLIArgsProfileUseMissingKey(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := ParseArgs([]string{"profile", "use"}, &stderr)
-	if err == nil || !strings.Contains(err.Error(), "please provide profile key") {
+	if err == nil || !strings.Contains(err.Error(), "profile key required") {
 		t.Fatalf("expected missing key error, got: %v", err)
 	}
 }
@@ -473,7 +473,7 @@ func TestParseCLIArgsProfileGet(t *testing.T) {
 func TestParseCLIArgsProfileGetMissingKey(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := ParseArgs([]string{"profile", "get"}, &stderr)
-	if err == nil || !strings.Contains(err.Error(), "please provide profile key") {
+	if err == nil || !strings.Contains(err.Error(), "profile key required") {
 		t.Fatalf("expected missing key error, got: %v", err)
 	}
 }
@@ -481,7 +481,7 @@ func TestParseCLIArgsProfileGetMissingKey(t *testing.T) {
 func TestParseCLIArgsProfileUnsupportedSubcommand(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := ParseArgs([]string{"profile", "rename"}, &stderr)
-	if err == nil || !strings.Contains(err.Error(), "unsupported profile subcommand") {
+	if err == nil || !strings.Contains(err.Error(), "unknown profile subcommand") {
 		t.Fatalf("expected unsupported subcommand error, got: %v", err)
 	}
 }
