@@ -9,10 +9,11 @@ import (
 )
 
 const (
-	appDirName     = "ttscli"
-	configName     = "config.json"
-	dirPermission  = 0o700
-	filePermission = 0o600
+	appDirName           = "ttscli"
+	configName           = "config.json"
+	dirPermission        = 0o700
+	filePermission       = 0o600
+	CurrentSchemaVersion = 1
 )
 
 type Profile struct {
@@ -23,6 +24,7 @@ type Profile struct {
 }
 
 type Config struct {
+	SchemaVersion  int                `json:"schemaVersion"`
 	ActiveProvider string             `json:"activeProvider"`
 	ActiveProfile  string             `json:"activeProfile"`
 	Profiles       map[string]Profile `json:"profiles"`
@@ -96,6 +98,12 @@ func LoadConfig() (Config, error) {
 	if err := json.Unmarshal(raw, &cfg); err != nil {
 		return Config{}, fmt.Errorf("parse config file: %w", err)
 	}
+	if cfg.SchemaVersion == 0 {
+		cfg.SchemaVersion = CurrentSchemaVersion
+	}
+	if cfg.SchemaVersion > CurrentSchemaVersion {
+		return Config{}, fmt.Errorf("config schema version %d is newer than supported (%d); please upgrade ttscli", cfg.SchemaVersion, CurrentSchemaVersion)
+	}
 	if cfg.Profiles == nil {
 		cfg.Profiles = make(map[string]Profile)
 	}
@@ -111,6 +119,7 @@ func SaveConfig(cfg Config) error {
 		return fmt.Errorf("create config dir: %w", err)
 	}
 
+	cfg.SchemaVersion = CurrentSchemaVersion
 	raw, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode config file: %w", err)

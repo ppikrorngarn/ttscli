@@ -151,6 +151,40 @@ func TestLoadConfigNilProfilesInitialized(t *testing.T) {
 	}
 }
 
+func TestLoadConfigAssumesCurrentSchemaVersionWhenMissing(t *testing.T) {
+	reset := stubConfigDeps()
+	defer reset()
+
+	readFile = func(path string) ([]byte, error) {
+		return []byte(`{"activeProvider":"gcp","activeProfile":"default","profiles":{}}`), nil
+	}
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.SchemaVersion != CurrentSchemaVersion {
+		t.Errorf("expected schemaVersion to default to %d, got %d", CurrentSchemaVersion, cfg.SchemaVersion)
+	}
+}
+
+func TestLoadConfigRejectsNewerSchemaVersion(t *testing.T) {
+	reset := stubConfigDeps()
+	defer reset()
+
+	readFile = func(path string) ([]byte, error) {
+		return []byte(`{"schemaVersion":99,"profiles":{}}`), nil
+	}
+
+	_, err := LoadConfig()
+	if err == nil {
+		t.Fatal("expected error for unsupported schema version")
+	}
+	if !strings.Contains(err.Error(), "newer than supported") {
+		t.Errorf("expected upgrade-hint error, got: %v", err)
+	}
+}
+
 func TestLoadConfigInvalidJSON(t *testing.T) {
 	reset := stubConfigDeps()
 	defer reset()
@@ -232,6 +266,9 @@ func TestSaveConfigSuccess(t *testing.T) {
 	}
 	if parsed.ActiveProvider != "gcp" {
 		t.Errorf("unexpected active provider in saved data: %q", parsed.ActiveProvider)
+	}
+	if parsed.SchemaVersion != CurrentSchemaVersion {
+		t.Errorf("expected schemaVersion %d in saved data, got %d", CurrentSchemaVersion, parsed.SchemaVersion)
 	}
 	if writtenPerm != 0o600 {
 		t.Errorf("expected config file perm 0o600, got %o", writtenPerm)
