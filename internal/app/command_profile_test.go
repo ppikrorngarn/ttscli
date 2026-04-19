@@ -204,6 +204,46 @@ func TestRunProfileDeleteActiveProfileCleared(t *testing.T) {
 	}
 }
 
+func TestRunProfileDeleteActiveSwitchesToRemaining(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	// Two profiles; the active one is deleted. Post-delete only gcp:work remains,
+	// so the map iteration target is deterministic.
+	loadConfig = func() (config.Config, error) {
+		return config.Config{
+			ActiveProvider: "gcp",
+			ActiveProfile:  "default",
+			Profiles: map[string]config.Profile{
+				"gcp:default": {Provider: "gcp", Name: "default"},
+				"gcp:work":    {Provider: "gcp", Name: "work"},
+			},
+		}, nil
+	}
+	var saved config.Config
+	saveConfig = func(cfg config.Config) error {
+		saved = cfg
+		return nil
+	}
+
+	var stdout bytes.Buffer
+	if err := runProfileDelete(cli.Config{Profile: "gcp:default"}, &stdout); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if saved.ActiveProvider != "gcp" || saved.ActiveProfile != "work" {
+		t.Errorf("expected active profile switched to gcp:work, got %s:%s", saved.ActiveProvider, saved.ActiveProfile)
+	}
+	if _, exists := saved.Profiles["gcp:default"]; exists {
+		t.Error("expected gcp:default to be removed from saved config")
+	}
+	if _, exists := saved.Profiles["gcp:work"]; !exists {
+		t.Error("expected gcp:work to remain in saved config")
+	}
+	if !strings.Contains(stdout.String(), "Switched active profile to: gcp:work") {
+		t.Errorf("expected switch message, got: %q", stdout.String())
+	}
+}
+
 func TestRunProfileUseSuccess(t *testing.T) {
 	reset := stubAppDeps()
 	defer reset()
