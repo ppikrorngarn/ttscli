@@ -261,6 +261,15 @@ Prefer managing profiles via the `ttscli profile` subcommands (see [Command Refe
 | `--lang` | string | `en-US` | Optional language filter for voice listing. Alias: `-l`. |
 | `--profile` | string | `""` | Profile to use (e.g., `gcp:default`). Alias: `-p`. |
 
+### `profile create` Flags
+
+| Flag | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `--provider` | string | `""` | Required. Provider name (e.g., `gcp`). Alias: `-P`. |
+| `--name` | string | `""` | Required. Unique profile name (e.g., `default`, `work`). Alias: `-n`. |
+| `--api-key` | string | `""` | Required. API key for the provider. Alias: `-k`. |
+| `--voice` | string | `""` | Optional default voice to seed into the profile. Alias: `-v`. |
+
 ### Basic Commands
 
 **0. Show CLI version/build metadata:**
@@ -285,6 +294,9 @@ ttscli profile list
 
 # Create a new profile
 ttscli profile create --provider gcp --name work --api-key YOUR_API_KEY
+
+# Create a profile with a default voice already set
+ttscli profile create --provider gcp --name work --api-key YOUR_API_KEY --voice en-US-Neural2-F
 
 # Set active profile
 ttscli profile use gcp:work
