@@ -172,8 +172,7 @@ On Windows, the equivalent is typically `ttscli.exe` from a directory such as `%
 **Profile Resolution**:
 1. `--profile` flag
 2. Active profile from config
-3. First available profile
-4. Error if no profiles exist
+3. Error if no active profile is set
 
 **Current Provider Support**:
 - ✅ **Google Cloud (GCP)**: Fully implemented
