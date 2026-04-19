@@ -167,7 +167,6 @@ func (c *Client) buildRequestURL(path string, extraParams url.Values) (string, e
 	}
 
 	params := url.Values{}
-	params.Set("key", c.apiKey)
 	for k, values := range extraParams {
 		for _, v := range values {
 			params.Add(k, v)
@@ -182,6 +181,7 @@ func (c *Client) buildRequestURL(path string, extraParams url.Values) (string, e
 }
 
 func (c *Client) do(req *http.Request) ([]byte, error) {
+	req.Header.Set("X-Goog-Api-Key", c.apiKey)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("http call: %w", err)

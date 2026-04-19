@@ -23,9 +23,7 @@ func TestTTSClientSynthesizeSuccess(t *testing.T) {
 		if r.URL.Path != apiPathSynthesize {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
-		if got := r.URL.Query().Get("key"); got != "k" {
-			t.Fatalf("unexpected api key query: %q", got)
-		}
+		assertAPIKeyHeader(t, r)
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintf(w, `{"audioContent":"%s"}`, audioB64)
 	}))
@@ -45,6 +43,7 @@ func TestTTSClientSynthesizeSuccess(t *testing.T) {
 
 func TestTTSClientSynthesizeRequestPayload(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertAPIKeyHeader(t, r)
 		var req synthesizeRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("failed to decode request payload: %v", err)
@@ -76,6 +75,7 @@ func TestTTSClientSynthesizeRequestPayload(t *testing.T) {
 
 func TestTTSClientSynthesizeErrorStatus(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertAPIKeyHeader(t, r)
 		http.Error(w, "bad request", http.StatusBadRequest)
 	}))
 	defer srv.Close()
@@ -91,6 +91,7 @@ func TestTTSClientSynthesizeErrorStatus(t *testing.T) {
 
 func TestTTSClientSynthesizeInvalidBase64(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertAPIKeyHeader(t, r)
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{"audioContent":"$$$"}`)
 	}))
@@ -107,6 +108,7 @@ func TestTTSClientSynthesizeInvalidBase64(t *testing.T) {
 
 func TestTTSClientSynthesizeInvalidJSON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertAPIKeyHeader(t, r)
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{invalid-json`)
 	}))
@@ -123,6 +125,7 @@ func TestTTSClientSynthesizeInvalidJSON(t *testing.T) {
 
 func TestTTSClientSynthesizeEmptyAudioContent(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertAPIKeyHeader(t, r)
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{"audioContent":""}`)
 	}))
@@ -142,6 +145,7 @@ func TestTTSClientListVoicesSuccess(t *testing.T) {
 		if r.URL.Path != apiPathVoices {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
+		assertAPIKeyHeader(t, r)
 		if got := r.URL.Query().Get("languageCode"); got != "en-GB" {
 			t.Fatalf("unexpected languageCode query: %q", got)
 		}
@@ -163,6 +167,7 @@ func TestTTSClientListVoicesSuccess(t *testing.T) {
 
 func TestTTSClientListVoicesOmitsLanguageCodeWhenEmpty(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertAPIKeyHeader(t, r)
 		if got := r.URL.Query().Get("languageCode"); got != "" {
 			t.Fatalf("expected no languageCode query, got %q", got)
 		}
@@ -181,6 +186,7 @@ func TestTTSClientListVoicesOmitsLanguageCodeWhenEmpty(t *testing.T) {
 
 func TestTTSClientListVoicesInvalidJSON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertAPIKeyHeader(t, r)
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{invalid-json`)
 	}))
@@ -206,7 +212,7 @@ func TestTTSClientBuildRequestURLInvalidBaseURL(t *testing.T) {
 }
 
 func TestTTSClientBuildRequestURLEncodesQueryParams(t *testing.T) {
-	c := NewClient("a+b/c=1", nil)
+	c := NewClient("k", nil)
 	c.baseURL = "https://example.com"
 
 	extra := url.Values{}
@@ -224,9 +230,6 @@ func TestTTSClientBuildRequestURLEncodesQueryParams(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse URL: %v", err)
 	}
-	if got := parsed.Query().Get("key"); got != "a+b/c=1" {
-		t.Fatalf("unexpected key param: %q", got)
-	}
 	if got := parsed.Query().Get("languageCode"); got != "en US/TH" {
 		t.Fatalf("unexpected languageCode param: %q", got)
 	}
@@ -235,6 +238,7 @@ func TestTTSClientBuildRequestURLEncodesQueryParams(t *testing.T) {
 func TestTTSClientSynthesizeHTTPCallError(t *testing.T) {
 	c := NewClient("k", &http.Client{
 		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			assertAPIKeyHeader(t, req)
 			return nil, errors.New("network down")
 		}),
 	})
@@ -249,6 +253,7 @@ func TestTTSClientSynthesizeHTTPCallError(t *testing.T) {
 func TestTTSClientSynthesizeReadResponseError(t *testing.T) {
 	c := NewClient("k", &http.Client{
 		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			assertAPIKeyHeader(t, req)
 			return &http.Response{
 				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(errReader{}),
@@ -266,6 +271,7 @@ func TestTTSClientSynthesizeReadResponseError(t *testing.T) {
 
 func TestTTSClientListVoicesErrorStatus(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertAPIKeyHeader(t, r)
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 	}))
 	defer srv.Close()
@@ -325,6 +331,13 @@ func TestPrintVoices(t *testing.T) {
 	}
 	if !strings.Contains(out, "en-US") {
 		t.Errorf("expected language code in header, got: %q", out)
+	}
+}
+
+func assertAPIKeyHeader(t *testing.T, r *http.Request) {
+	t.Helper()
+	if got := r.Header.Get("X-Goog-Api-Key"); got != "k" {
+		t.Fatalf("unexpected api key header: %q", got)
 	}
 }
 
