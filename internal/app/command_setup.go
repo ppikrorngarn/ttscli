@@ -48,7 +48,7 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 	fmt.Fprintf(stdout, "Note: Press Enter to use the built-in defaults (%s / %s).\n", cli.DefaultLanguage, cli.DefaultVoice)
 	fmt.Fprintln(stdout)
 
-	inputAPIKey, err := promptLine(reader, stdout, "Enter your Google Cloud API key: ")
+	inputAPIKey, err := promptPassword(reader, stdout, "Enter your Google Cloud API key: ")
 	if err != nil {
 		return fmt.Errorf("read api key: %w", err)
 	}

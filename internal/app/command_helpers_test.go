@@ -101,3 +101,39 @@ func TestPromptYesNoInvalidThenValid(t *testing.T) {
 		t.Error("expected retry message to be printed")
 	}
 }
+
+func TestPromptPassword(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	readPassword = func() ([]byte, error) { return []byte("secret-api-key"), nil }
+
+	reader := bufio.NewReader(strings.NewReader(""))
+	var stdout bytes.Buffer
+
+	got, err := promptPassword(reader, &stdout, "Enter API key: ")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "secret-api-key" {
+		t.Errorf("expected %q, got %q", "secret-api-key", got)
+	}
+	if stdout.String() != "Enter API key: \n" {
+		t.Errorf("expected prompt and newline, got %q", stdout.String())
+	}
+}
+
+func TestPromptPasswordTrimsWhitespace(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	readPassword = func() ([]byte, error) { return []byte("  secret  "), nil }
+
+	got, err := promptPassword(bufio.NewReader(strings.NewReader("")), &bytes.Buffer{}, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "secret" {
+		t.Errorf("expected trimmed value, got %q", got)
+	}
+}

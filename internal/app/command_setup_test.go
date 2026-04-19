@@ -29,8 +29,9 @@ func TestRunSetupCommandSuccess(t *testing.T) {
 		}, nil
 	}
 	playAudio = func(audio []byte, stdout, stderr io.Writer) error { return nil }
-	// api-key, default lang (enter), default voice (enter), no sound check
-	setupInput = strings.NewReader("my-api-key\n\n\nn\n")
+	readPassword = func() ([]byte, error) { return []byte("my-api-key"), nil }
+	// default lang (enter), default voice (enter), no sound check
+	setupInput = strings.NewReader("\n\nn\n")
 
 	var stdout bytes.Buffer
 	if err := runSetupCommand(&stdout, &bytes.Buffer{}); err != nil {
@@ -52,7 +53,7 @@ func TestRunSetupCommandEmptyAPIKey(t *testing.T) {
 	loadConfig = func() (config.Config, error) {
 		return config.Config{Profiles: map[string]config.Profile{}}, nil
 	}
-	setupInput = strings.NewReader("\n") // empty API key
+	readPassword = func() ([]byte, error) { return []byte(""), nil } // empty API key
 
 	err := runSetupCommand(&bytes.Buffer{}, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "API key is required") {
@@ -91,8 +92,9 @@ func TestRunSetupCommandVoiceNotAvailable(t *testing.T) {
 			synthesizeFn: nil,
 		}, nil
 	}
+	readPassword = func() ([]byte, error) { return []byte("my-api-key"), nil }
 	// requests en-US-Neural2-F which won't be in the list above
-	setupInput = strings.NewReader("my-api-key\n\nen-US-Neural2-F\n")
+	setupInput = strings.NewReader("\nen-US-Neural2-F\n")
 
 	err := runSetupCommand(&bytes.Buffer{}, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "not available") {
@@ -122,7 +124,8 @@ func TestRunSetupCommandSoundCheck(t *testing.T) {
 		playCalled = true
 		return nil
 	}
-	setupInput = strings.NewReader("my-api-key\n\n\ny\n") // say yes to sound check
+	readPassword = func() ([]byte, error) { return []byte("my-api-key"), nil }
+	setupInput = strings.NewReader("\n\ny\n") // say yes to sound check
 
 	if err := runSetupCommand(&bytes.Buffer{}, &bytes.Buffer{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)

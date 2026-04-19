@@ -27,6 +27,16 @@ func promptLine(reader *bufio.Reader, stdout io.Writer, prompt string) (string, 
 	return strings.TrimSpace(raw), nil
 }
 
+func promptPassword(reader *bufio.Reader, stdout io.Writer, prompt string) (string, error) {
+	fmt.Fprint(stdout, prompt)
+	password, err := readPassword()
+	if err != nil {
+		return "", err
+	}
+	fmt.Fprintln(stdout) // Add newline after password input
+	return strings.TrimSpace(string(password)), nil
+}
+
 func promptYesNo(reader *bufio.Reader, stdout io.Writer, prompt string, defaultYes bool) (bool, error) {
 	for {
 		input, err := promptLine(reader, stdout, prompt)

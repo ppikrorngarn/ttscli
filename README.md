@@ -110,6 +110,7 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
    ```
     This guided flow prompts for API key, default language, and default voice, validates them, and can run a sound check.
     Press Enter on language/voice prompts to use built-in defaults: `en-US` and `en-US-Neural2-F`.
+    **Note:** The API key input is masked (hidden) as you type or paste for security.
 
 ### Contributor Setup
 

@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"syscall"
 
+	"golang.org/x/term"
+
 	"github.com/ppikrorngarn/ttscli/internal/cli"
 	"github.com/ppikrorngarn/ttscli/internal/config"
 	"github.com/ppikrorngarn/ttscli/internal/player"
@@ -31,10 +33,15 @@ var (
 	writeFile             = os.WriteFile
 	playAudio             = player.PlayAudio
 	setupInput  io.Reader = os.Stdin
+	readPassword          = readPasswordImpl
 	newAppCtx             = func() (context.Context, context.CancelFunc) {
 		return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	}
 )
+
+func readPasswordImpl() ([]byte, error) {
+	return term.ReadPassword(int(os.Stdin.Fd()))
+}
 
 func newProviderImpl(profile config.Profile) (tts.Provider, error) {
 	var creds interface{}
