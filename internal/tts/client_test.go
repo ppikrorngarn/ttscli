@@ -236,9 +236,12 @@ func TestTTSClientBuildRequestURLEncodesQueryParams(t *testing.T) {
 }
 
 func TestTTSClientSynthesizeHTTPCallError(t *testing.T) {
-	c := NewClient("k", &http.Client{
+	const apiKey = "tts-sentinel-api-key-12345"
+	c := NewClient(apiKey, &http.Client{
 		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
-			assertAPIKeyHeader(t, req)
+			if got := req.Header.Get("X-Goog-Api-Key"); got != apiKey {
+				t.Fatalf("unexpected api key header: %q", got)
+			}
 			return nil, errors.New("network down")
 		}),
 	})
@@ -247,6 +250,9 @@ func TestTTSClientSynthesizeHTTPCallError(t *testing.T) {
 	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
 	if err == nil || !strings.Contains(err.Error(), "http call") {
 		t.Fatalf("expected http call error, got: %v", err)
+	}
+	if strings.Contains(err.Error(), apiKey) {
+		t.Fatalf("api key leaked into transport error: %v", err)
 	}
 }
 
