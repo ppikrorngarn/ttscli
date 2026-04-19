@@ -73,10 +73,10 @@ func runProfileList(stdout io.Writer) error {
 }
 
 func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
-	if cfg.Lang == "" {
+	if cfg.Provider == "" {
 		return fmt.Errorf("--provider is required. Specify the TTS provider (gcp, aws, azure, ibm, alibaba)")
 	}
-	if cfg.Voice == "" {
+	if cfg.ProfileName == "" {
 		return fmt.Errorf("--name is required. Choose a unique name for this profile")
 	}
 	if cfg.APIKey == "" {
@@ -88,22 +88,22 @@ func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	profileKey := cfg.Lang + ":" + cfg.Voice
+	profileKey := cfg.Provider + ":" + cfg.ProfileName
 	if _, exists := appCfg.Profiles[profileKey]; exists {
 		return fmt.Errorf("profile '%s' already exists. Choose a different name or delete it first", profileKey)
 	}
 
 	profile := config.Profile{
-		Provider: cfg.Lang,
-		Name:     cfg.Voice,
+		Provider: cfg.Provider,
+		Name:     cfg.ProfileName,
 		Credentials: map[string]interface{}{
 			"apiKey": cfg.APIKey,
 		},
 		Defaults: make(map[string]string),
 	}
 
-	if cfg.SavePath != "" {
-		profile.Defaults["voice"] = cfg.SavePath
+	if cfg.DefaultVoice != "" {
+		profile.Defaults["voice"] = cfg.DefaultVoice
 	}
 
 	fmt.Fprintln(stdout, "Validating provider credentials...")

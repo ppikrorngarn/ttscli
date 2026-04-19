@@ -89,7 +89,7 @@ func TestRunProfileCreateSuccess(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	cfg := cli.Config{Lang: "gcp", Voice: "work", APIKey: "test-key"}
+	cfg := cli.Config{Provider: "gcp", ProfileName: "work", APIKey: "test-key"}
 	if err := runProfileCreate(cfg, &stdout); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestRunProfileCreateAlreadyExists(t *testing.T) {
 	defer reset()
 
 	// stubAppDeps has gcp:default — try to create it again.
-	cfg := cli.Config{Lang: "gcp", Voice: "default", APIKey: "test-key"}
+	cfg := cli.Config{Provider: "gcp", ProfileName: "default", APIKey: "test-key"}
 	err := runProfileCreate(cfg, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Fatalf("expected already exists error, got: %v", err)
@@ -114,7 +114,7 @@ func TestRunProfileCreateMissingProvider(t *testing.T) {
 	reset := stubAppDeps()
 	defer reset()
 
-	cfg := cli.Config{Voice: "work", APIKey: "test-key"}
+	cfg := cli.Config{ProfileName: "work", APIKey: "test-key"}
 	err := runProfileCreate(cfg, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "--provider is required") {
 		t.Fatalf("expected provider required error, got: %v", err)
@@ -125,7 +125,7 @@ func TestRunProfileCreateMissingName(t *testing.T) {
 	reset := stubAppDeps()
 	defer reset()
 
-	cfg := cli.Config{Lang: "gcp", APIKey: "test-key"}
+	cfg := cli.Config{Provider: "gcp", APIKey: "test-key"}
 	err := runProfileCreate(cfg, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "--name is required") {
 		t.Fatalf("expected name required error, got: %v", err)
@@ -136,7 +136,7 @@ func TestRunProfileCreateMissingAPIKey(t *testing.T) {
 	reset := stubAppDeps()
 	defer reset()
 
-	cfg := cli.Config{Lang: "gcp", Voice: "work"}
+	cfg := cli.Config{Provider: "gcp", ProfileName: "work"}
 	err := runProfileCreate(cfg, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "--api-key is required") {
 		t.Fatalf("expected api-key required error, got: %v", err)

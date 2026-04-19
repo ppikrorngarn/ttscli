@@ -410,11 +410,11 @@ func TestParseCLIArgsProfileCreate(t *testing.T) {
 	if cfg.Mode != ModeProfile || cfg.DefaultSubcommand != ProfileCreate {
 		t.Errorf("unexpected mode/subcommand: %+v", cfg)
 	}
-	if cfg.Lang != "gcp" {
-		t.Errorf("expected provider gcp (stored in Lang), got %q", cfg.Lang)
+	if cfg.Provider != "gcp" {
+		t.Errorf("expected provider gcp, got %q", cfg.Provider)
 	}
-	if cfg.Voice != "work" {
-		t.Errorf("expected name work (stored in Voice), got %q", cfg.Voice)
+	if cfg.ProfileName != "work" {
+		t.Errorf("expected name work, got %q", cfg.ProfileName)
 	}
 	if cfg.APIKey != "mykey" {
 		t.Errorf("expected api-key mykey, got %q", cfg.APIKey)

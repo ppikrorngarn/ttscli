@@ -65,6 +65,9 @@ type Config struct {
 	HasAPIKeyFlag     bool
 	DefaultSubcommand string
 	Profile           string
+	Provider          string
+	ProfileName       string
+	DefaultVoice      string
 }
 
 func ParseArgs(args []string, stderr io.Writer) (Config, error) {
@@ -296,12 +299,12 @@ func parseProfileCommand(args []string, stderr io.Writer) (Config, error) {
 		fs.SetOutput(stderr)
 		fs.StringVar(&cfg.APIKey, "api-key", "", "API key for the provider")
 		fs.StringVar(&cfg.APIKey, "k", "", "API key (shorthand)")
-		fs.StringVar(&cfg.Lang, "provider", "", "Provider name (gcp, aws, azure, ibm, alibaba)")
-		fs.StringVar(&cfg.Lang, "P", "", "Provider name (shorthand)")
-		fs.StringVar(&cfg.Voice, "name", "", "Profile name")
-		fs.StringVar(&cfg.Voice, "n", "", "Profile name (shorthand)")
-		fs.StringVar(&cfg.SavePath, "voice", "", "Default voice for this profile")
-		fs.StringVar(&cfg.SavePath, "v", "", "Default voice (shorthand)")
+		fs.StringVar(&cfg.Provider, "provider", "", "Provider name (gcp, aws, azure, ibm, alibaba)")
+		fs.StringVar(&cfg.Provider, "P", "", "Provider name (shorthand)")
+		fs.StringVar(&cfg.ProfileName, "name", "", "Profile name")
+		fs.StringVar(&cfg.ProfileName, "n", "", "Profile name (shorthand)")
+		fs.StringVar(&cfg.DefaultVoice, "voice", "", "Default voice for this profile")
+		fs.StringVar(&cfg.DefaultVoice, "v", "", "Default voice (shorthand)")
 		if err := fs.Parse(args[1:]); err != nil {
 			return cfg, err
 		}
