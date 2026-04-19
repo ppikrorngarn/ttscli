@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	appDirName    = "ttscli"
-	configName    = "config.json"
-	dirPermission = 0o755
+	appDirName     = "ttscli"
+	configName     = "config.json"
+	dirPermission  = 0o700
+	filePermission = 0o600
 )
 
 type Profile struct {
@@ -114,7 +115,7 @@ func SaveConfig(cfg Config) error {
 		return fmt.Errorf("encode config file: %w", err)
 	}
 	raw = append(raw, '\n')
-	if err := writeFile(path, raw, 0o644); err != nil {
+	if err := writeFile(path, raw, filePermission); err != nil {
 		return fmt.Errorf("write config file: %w", err)
 	}
 	return nil
