@@ -45,6 +45,7 @@ var (
 	writeFile  = os.WriteFile
 	mkdirAll   = os.MkdirAll
 	removeFile = os.Remove
+	renameFile = os.Rename
 )
 
 func Path() (string, error) {
@@ -115,8 +116,14 @@ func SaveConfig(cfg Config) error {
 		return fmt.Errorf("encode config file: %w", err)
 	}
 	raw = append(raw, '\n')
-	if err := writeFile(path, raw, filePermission); err != nil {
+
+	tmpPath := path + ".tmp"
+	if err := writeFile(tmpPath, raw, filePermission); err != nil {
 		return fmt.Errorf("write config file: %w", err)
+	}
+	if err := renameFile(tmpPath, path); err != nil {
+		_ = removeFile(tmpPath)
+		return fmt.Errorf("finalize config file: %w", err)
 	}
 	return nil
 }

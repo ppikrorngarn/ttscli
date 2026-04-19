@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -16,6 +17,7 @@ func stubConfigDeps() func() {
 	oldWriteFile := writeFile
 	oldMkdirAll := mkdirAll
 	oldRemoveFile := removeFile
+	oldRenameFile := renameFile
 
 	userConfigDir = func() (string, error) {
 		return "/tmp/usercfg", nil
@@ -38,6 +40,9 @@ func stubConfigDeps() func() {
 	removeFile = func(path string) error {
 		return nil
 	}
+	renameFile = func(oldpath, newpath string) error {
+		return nil
+	}
 
 	return func() {
 		userConfigDir = oldUserConfigDir
@@ -47,6 +52,7 @@ func stubConfigDeps() func() {
 		writeFile = oldWriteFile
 		mkdirAll = oldMkdirAll
 		removeFile = oldRemoveFile
+		renameFile = oldRenameFile
 	}
 }
 
@@ -181,6 +187,7 @@ func TestSaveConfigSuccess(t *testing.T) {
 	var writtenData []byte
 	var writtenPerm os.FileMode
 	var dirPerm os.FileMode
+	var renameSrc, renameDst string
 	writeFile = func(path string, data []byte, perm os.FileMode) error {
 		writtenPath = path
 		writtenData = data
@@ -189,6 +196,11 @@ func TestSaveConfigSuccess(t *testing.T) {
 	}
 	mkdirAll = func(_ string, perm os.FileMode) error {
 		dirPerm = perm
+		return nil
+	}
+	renameFile = func(oldpath, newpath string) error {
+		renameSrc = oldpath
+		renameDst = newpath
 		return nil
 	}
 
@@ -202,8 +214,17 @@ func TestSaveConfigSuccess(t *testing.T) {
 	if err := SaveConfig(cfg); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if writtenPath == "" {
-		t.Error("expected writeFile to be called")
+	if !strings.HasSuffix(writtenPath, ".tmp") {
+		t.Errorf("expected writeFile to target a .tmp path, got %q", writtenPath)
+	}
+	if renameSrc != writtenPath {
+		t.Errorf("expected rename from tmp path %q, got src %q", writtenPath, renameSrc)
+	}
+	if renameDst == "" || strings.HasSuffix(renameDst, ".tmp") {
+		t.Errorf("expected rename target to be final config path, got %q", renameDst)
+	}
+	if renameDst+".tmp" != renameSrc {
+		t.Errorf("expected tmp path to be final path + \".tmp\": src=%q dst=%q", renameSrc, renameDst)
 	}
 	var parsed Config
 	if err := json.Unmarshal(writtenData, &parsed); err != nil {
@@ -245,6 +266,36 @@ func TestSaveConfigWriteError(t *testing.T) {
 	err := SaveConfig(Config{Profiles: map[string]Profile{}})
 	if err == nil {
 		t.Fatal("expected error when write fails")
+	}
+}
+
+func TestSaveConfigRenameErrorCleansUpTmp(t *testing.T) {
+	reset := stubConfigDeps()
+	defer reset()
+
+	var writtenPath string
+	var removed string
+	writeFile = func(path string, data []byte, perm os.FileMode) error {
+		writtenPath = path
+		return nil
+	}
+	renameFile = func(oldpath, newpath string) error {
+		return errors.New("rename failed")
+	}
+	removeFile = func(path string) error {
+		removed = path
+		return nil
+	}
+
+	err := SaveConfig(Config{Profiles: map[string]Profile{}})
+	if err == nil {
+		t.Fatal("expected error when rename fails")
+	}
+	if !strings.Contains(err.Error(), "finalize config file") {
+		t.Errorf("expected finalize error wrapping, got: %v", err)
+	}
+	if removed == "" || removed != writtenPath {
+		t.Errorf("expected tmp file %q to be removed, got %q", writtenPath, removed)
 	}
 }
 
