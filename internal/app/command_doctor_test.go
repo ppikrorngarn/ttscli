@@ -79,13 +79,25 @@ func TestCheckPlaybackCapabilityLinuxNoPlayers(t *testing.T) {
 
 func TestCheckPlaybackCapabilityWindowsFound(t *testing.T) {
 	check := checkPlaybackCapability("windows", func(f string) (string, error) {
-		if f == "powershell" {
-			return "powershell", nil
+		if f == "mpg123" {
+			return `C:\tools\mpg123.exe`, nil
 		}
 		return "", errors.New("missing")
 	})
-	if !check.ok || check.detail != "PowerShell found" {
-		t.Errorf("expected ok with powershell, got %+v", check)
+	if !check.ok || check.detail != "mpg123 found" {
+		t.Errorf("expected ok with mpg123, got %+v", check)
+	}
+}
+
+func TestCheckPlaybackCapabilityWindowsFfplay(t *testing.T) {
+	check := checkPlaybackCapability("windows", func(f string) (string, error) {
+		if f == "ffplay" {
+			return `C:\tools\ffplay.exe`, nil
+		}
+		return "", errors.New("missing")
+	})
+	if !check.ok || check.detail != "ffplay found" {
+		t.Errorf("expected ok with ffplay, got %+v", check)
 	}
 }
 
@@ -94,7 +106,7 @@ func TestCheckPlaybackCapabilityWindowsNotFound(t *testing.T) {
 		return "", errors.New("missing")
 	})
 	if check.ok {
-		t.Error("expected not ok when powershell not found")
+		t.Error("expected not ok when no players found")
 	}
 }
 

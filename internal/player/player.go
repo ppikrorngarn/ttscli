@@ -70,8 +70,13 @@ func buildPlayCommand(goos, filePath string, lookPath func(file string) (string,
 		}
 		return nil, errors.New("no supported audio player found on Linux (try installing mpg123)")
 	case "windows":
-		psScript := fmt.Sprintf(`(New-Object Media.SoundPlayer "%s").PlaySync()`, filePath)
-		return exec.Command("powershell", "-c", psScript), nil
+		if _, err := lookPath("mpg123"); err == nil {
+			return exec.Command("mpg123", "-q", filePath), nil
+		}
+		if _, err := lookPath("ffplay"); err == nil {
+			return exec.Command("ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", filePath), nil
+		}
+		return nil, errors.New("no supported audio player found on Windows (install ffplay via ffmpeg, or mpg123)")
 	default:
 		return nil, fmt.Errorf("unsupported platform for audio playback: %s", goos)
 	}

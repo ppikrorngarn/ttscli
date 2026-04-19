@@ -10,8 +10,12 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
 2. **Cloud Provider API Key:** You need an API key for your chosen TTS provider.
    - **Google Cloud:** Go to Google Cloud Console > APIs & Services > Credentials. Create an API Key and restrict it to the "Cloud Text-to-Speech API".
    - **Other providers:** Support coming soon.
-3. **Audio Player (Linux Only):** If you are running on Linux and want to use the `speak` command (which plays audio), you need an audio player installed. The CLI looks for `mpg123`, `paplay`, or `ffplay`.
-   - Ubuntu/Debian: `sudo apt install mpg123`
+3. **Audio Player (Linux and Windows):** The `speak` command plays MP3 audio and needs an external player. macOS ships with `afplay` by default, so no install is needed there.
+   - **Linux:** install one of `mpg123`, `paplay`, or `ffplay`.
+     - Ubuntu/Debian: `sudo apt install mpg123`
+   - **Windows:** install one of `mpg123` or `ffplay` (ships with [ffmpeg](https://ffmpeg.org/)) and make sure the binary is on your `Path`.
+     - Scoop: `scoop install ffmpeg` or `scoop install mpg123`
+     - Chocolatey: `choco install ffmpeg` or `choco install mpg123`
 4. **Staticcheck (for local quality checks):** Optional but recommended for contributors.
    - Install: `go install honnef.co/go/tools/cmd/staticcheck@v0.7.0`
 
@@ -390,7 +394,7 @@ internal/app/        Command handlers (setup, doctor, profile, completion). Orch
 internal/config/     JSON config file I/O. Profile CRUD. Two-step path resolution (local next
                      to the binary, falling back to the user config directory).
 internal/player/     Cross-platform audio playback. macOS: afplay. Linux: mpg123/paplay/ffplay.
-                     Windows: PowerShell Media.SoundPlayer.
+                     Windows: mpg123 or ffplay (requires install).
 internal/tts/        Provider interface, GCP HTTP client, voice listing, PrintVoices helper.
 ```
 

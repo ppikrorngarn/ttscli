@@ -192,17 +192,18 @@ func checkPlaybackCapability(goos string, lookPath func(file string) (string, er
 			hint:   "Install a player: sudo apt install mpg123 (Debian/Ubuntu) or sudo dnf install mpg123 (Fedora)",
 		}
 	case "windows":
-		if _, err := lookPath("powershell"); err != nil {
-			if _, errExe := lookPath("powershell.exe"); errExe != nil {
-				return doctorCheck{
-					name:   "Audio playback",
-					ok:     false,
-					detail: "PowerShell not found",
-					hint:   "Ensure PowerShell is available in your PATH.",
-				}
-			}
+		if _, err := lookPath("mpg123"); err == nil {
+			return doctorCheck{name: "Audio playback", ok: true, detail: "mpg123 found"}
 		}
-		return doctorCheck{name: "Audio playback", ok: true, detail: "PowerShell found"}
+		if _, err := lookPath("ffplay"); err == nil {
+			return doctorCheck{name: "Audio playback", ok: true, detail: "ffplay found"}
+		}
+		return doctorCheck{
+			name:   "Audio playback",
+			ok:     false,
+			detail: "No supported player found (requires mpg123 or ffplay)",
+			hint:   "Install ffplay (ships with ffmpeg from https://ffmpeg.org/) or mpg123, and ensure the binary is on your PATH.",
+		}
 	default:
 		return doctorCheck{
 			name:   "Audio playback",
