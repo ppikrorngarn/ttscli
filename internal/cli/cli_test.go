@@ -440,6 +440,17 @@ func TestParseCLIArgsProfileDeleteMissingKey(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsProfileDeleteRejectsExtraArgs(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"profile", "delete", "gcp:default", "extra"}, &stderr)
+	if err == nil {
+		t.Fatal("expected too many arguments error")
+	}
+	if !strings.Contains(err.Error(), "too many arguments") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestParseCLIArgsProfileUse(t *testing.T) {
 	var stderr bytes.Buffer
 	cfg, err := ParseArgs([]string{"profile", "use", "gcp:default"}, &stderr)
@@ -459,6 +470,17 @@ func TestParseCLIArgsProfileUseMissingKey(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsProfileUseRejectsExtraArgs(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"profile", "use", "gcp:default", "extra"}, &stderr)
+	if err == nil {
+		t.Fatal("expected too many arguments error")
+	}
+	if !strings.Contains(err.Error(), "too many arguments") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestParseCLIArgsProfileGet(t *testing.T) {
 	var stderr bytes.Buffer
 	cfg, err := ParseArgs([]string{"profile", "get", "gcp:default"}, &stderr)
@@ -475,6 +497,17 @@ func TestParseCLIArgsProfileGetMissingKey(t *testing.T) {
 	_, err := ParseArgs([]string{"profile", "get"}, &stderr)
 	if err == nil || !strings.Contains(err.Error(), "profile key required") {
 		t.Fatalf("expected missing key error, got: %v", err)
+	}
+}
+
+func TestParseCLIArgsProfileGetRejectsExtraArgs(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"profile", "get", "gcp:default", "extra"}, &stderr)
+	if err == nil {
+		t.Fatal("expected too many arguments error")
+	}
+	if !strings.Contains(err.Error(), "too many arguments") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
