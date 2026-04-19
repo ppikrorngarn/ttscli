@@ -263,3 +263,81 @@ func TestRunDoctorCommandNoActiveProfile(t *testing.T) {
 		t.Errorf("expected no active profile message, got: %q", stdout.String())
 	}
 }
+
+func TestRunDoctorCommandGetProfileError(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	currentGOOS = func() string { return "darwin" }
+	lookPathCmd = func(f string) (string, error) { return "/usr/bin/" + f, nil }
+	getProfile = func(cfg config.Config, key string) (config.Profile, error) {
+		return config.Profile{}, errors.New("profile lookup failed")
+	}
+
+	var stdout bytes.Buffer
+	err := runDoctorCommand(&stdout)
+	if err == nil {
+		t.Fatal("expected error when getProfile fails")
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "profile lookup failed") {
+		t.Errorf("expected getProfile error detail in output, got: %q", out)
+	}
+	if !strings.Contains(out, "Skipped (invalid active profile)") {
+		t.Errorf("expected API connectivity to be skipped, got: %q", out)
+	}
+}
+
+func TestRunDoctorCommandNewProviderError(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	currentGOOS = func() string { return "darwin" }
+	lookPathCmd = func(f string) (string, error) { return "/usr/bin/" + f, nil }
+	newProvider = func(profile config.Profile) (tts.Provider, error) {
+		return nil, errors.New("provider init failed")
+	}
+
+	var stdout bytes.Buffer
+	err := runDoctorCommand(&stdout)
+	if err == nil {
+		t.Fatal("expected error when newProvider fails")
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "Provider initialization") {
+		t.Errorf("expected Provider initialization check in output, got: %q", out)
+	}
+	if !strings.Contains(out, "provider init failed") {
+		t.Errorf("expected newProvider error detail in output, got: %q", out)
+	}
+	if !strings.Contains(out, "Skipped (provider initialization failed)") {
+		t.Errorf("expected API connectivity to be skipped, got: %q", out)
+	}
+}
+
+func TestRunDoctorCommandEmptyVoices(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	currentGOOS = func() string { return "darwin" }
+	lookPathCmd = func(f string) (string, error) { return "/usr/bin/" + f, nil }
+	newProvider = func(profile config.Profile) (tts.Provider, error) {
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, lang string) ([]tts.Voice, error) {
+				return []tts.Voice{}, nil
+			},
+			synthesizeFn: func(ctx context.Context, text, lang, voice, enc string) ([]byte, error) {
+				return nil, nil
+			},
+		}, nil
+	}
+
+	var stdout bytes.Buffer
+	err := runDoctorCommand(&stdout)
+	if err == nil {
+		t.Fatal("expected error when voices list is empty")
+	}
+	if !strings.Contains(stdout.String(), "Connected but no voices returned") {
+		t.Errorf("expected empty-voices message, got: %q", stdout.String())
+	}
+}
