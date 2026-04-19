@@ -380,7 +380,6 @@ internal/config/     JSON config file I/O. Profile CRUD. Two-step path resolutio
 internal/player/     Cross-platform audio playback. macOS: afplay. Linux: mpg123/paplay/ffplay.
                      Windows: PowerShell Media.SoundPlayer.
 internal/tts/        Provider interface, GCP HTTP client, voice listing, PrintVoices helper.
-docs/                Documentation.
 ```
 
 Packages under `internal/` use small, package-level function variables (e.g. `readFile`, `writeFile`, `lookupEnv`) for dependency injection, so tests can stub the filesystem, environment, and HTTP calls without real I/O.
