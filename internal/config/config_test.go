@@ -179,9 +179,16 @@ func TestSaveConfigSuccess(t *testing.T) {
 
 	var writtenPath string
 	var writtenData []byte
+	var writtenPerm os.FileMode
+	var dirPerm os.FileMode
 	writeFile = func(path string, data []byte, perm os.FileMode) error {
 		writtenPath = path
 		writtenData = data
+		writtenPerm = perm
+		return nil
+	}
+	mkdirAll = func(_ string, perm os.FileMode) error {
+		dirPerm = perm
 		return nil
 	}
 
@@ -204,6 +211,12 @@ func TestSaveConfigSuccess(t *testing.T) {
 	}
 	if parsed.ActiveProvider != "gcp" {
 		t.Errorf("unexpected active provider in saved data: %q", parsed.ActiveProvider)
+	}
+	if writtenPerm != 0o600 {
+		t.Errorf("expected config file perm 0o600, got %o", writtenPerm)
+	}
+	if dirPerm != 0o700 {
+		t.Errorf("expected config dir perm 0o700, got %o", dirPerm)
 	}
 }
 
