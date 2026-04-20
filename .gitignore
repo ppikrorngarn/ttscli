@@ -1,6 +1,9 @@
 # Binaries
 /ttscli
 
+# GoReleaser output
+/dist/
+
 # OS specific files
 .DS_Store
 
