@@ -20,10 +20,10 @@ func stubConfigDeps() func() {
 	oldRenameFile := renameFile
 
 	userConfigDir = func() (string, error) {
-		return "/tmp/usercfg", nil
+		return filepath.Join(string(filepath.Separator), "tmp", "usercfg"), nil
 	}
 	executablePath = func() (string, error) {
-		return "/tmp/app/config.json", nil
+		return filepath.Join(string(filepath.Separator), "tmp", "app", "ttscli"), nil
 	}
 	fileExists = func(path string) (bool, error) {
 		return false, nil
@@ -62,15 +62,16 @@ func TestPathPrefersLocalConfigNextToBinaryWhenExists(t *testing.T) {
 	reset := stubConfigDeps()
 	defer reset()
 
+	localCfg := filepath.Join(string(filepath.Separator), "tmp", "app", configName)
 	fileExists = func(path string) (bool, error) {
-		return path == "/tmp/app/config.json", nil
+		return filepath.Clean(path) == filepath.Clean(localCfg), nil
 	}
 
 	got, err := Path()
 	if err != nil {
 		t.Fatalf("Path returned error: %v", err)
 	}
-	want := "/tmp/app/config.json"
+	want := localCfg
 	if got != want {
 		t.Fatalf("unexpected path: got=%q want=%q", got, want)
 	}
@@ -84,7 +85,7 @@ func TestPathFallsBackToUserPathWhenLocalConfigMissing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Path returned error: %v", err)
 	}
-	want := filepath.Join("/tmp/usercfg", appDirName, configName)
+	want := filepath.Join(string(filepath.Separator), "tmp", "usercfg", appDirName, configName)
 	if got != want {
 		t.Fatalf("unexpected path: got=%q want=%q", got, want)
 	}
