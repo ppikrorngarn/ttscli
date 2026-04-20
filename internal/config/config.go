@@ -91,12 +91,12 @@ func LoadConfig() (Config, error) {
 		if errors.Is(err, os.ErrNotExist) {
 			return Config{Profiles: make(map[string]Profile)}, nil
 		}
-		return Config{}, fmt.Errorf("read config file: %w", err)
+		return Config{}, fmt.Errorf("read config file (%s): %w", path, err)
 	}
 
 	var cfg Config
 	if err := json.Unmarshal(raw, &cfg); err != nil {
-		return Config{}, fmt.Errorf("parse config file: %w", err)
+		return Config{}, fmt.Errorf("parse config file (%s): %w", path, err)
 	}
 	if cfg.SchemaVersion == 0 {
 		cfg.SchemaVersion = CurrentSchemaVersion
@@ -116,7 +116,7 @@ func SaveConfig(cfg Config) error {
 		return err
 	}
 	if err := mkdirAll(filepath.Dir(path), dirPermission); err != nil {
-		return fmt.Errorf("create config dir: %w", err)
+		return fmt.Errorf("create config dir (%s): %w", filepath.Dir(path), err)
 	}
 
 	cfg.SchemaVersion = CurrentSchemaVersion
@@ -128,11 +128,11 @@ func SaveConfig(cfg Config) error {
 
 	tmpPath := path + ".tmp"
 	if err := writeFile(tmpPath, raw, filePermission); err != nil {
-		return fmt.Errorf("write config file: %w", err)
+		return fmt.Errorf("write config file (%s): %w", tmpPath, err)
 	}
 	if err := renameFile(tmpPath, path); err != nil {
 		_ = removeFile(tmpPath)
-		return fmt.Errorf("finalize config file: %w", err)
+		return fmt.Errorf("finalize config file (%s): %w", path, err)
 	}
 	return nil
 }

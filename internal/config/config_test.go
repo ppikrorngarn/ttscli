@@ -210,6 +210,26 @@ func TestLoadConfigReadError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for read failure")
 	}
+	if !strings.Contains(err.Error(), "/tmp/usercfg/ttscli/config.json") {
+		t.Errorf("expected error to include config path, got: %v", err)
+	}
+}
+
+func TestLoadConfigParseError(t *testing.T) {
+	reset := stubConfigDeps()
+	defer reset()
+
+	readFile = func(path string) ([]byte, error) {
+		return []byte(`{invalid`), nil
+	}
+
+	_, err := LoadConfig()
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+	if !strings.Contains(err.Error(), "/tmp/usercfg/ttscli/config.json") {
+		t.Errorf("expected error to include config path, got: %v", err)
+	}
 }
 
 // SaveConfig tests
@@ -291,6 +311,9 @@ func TestSaveConfigMkdirError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when mkdir fails")
 	}
+	if !strings.Contains(err.Error(), "/tmp/usercfg/ttscli") {
+		t.Errorf("expected error to include config dir path, got: %v", err)
+	}
 }
 
 func TestSaveConfigWriteError(t *testing.T) {
@@ -304,6 +327,9 @@ func TestSaveConfigWriteError(t *testing.T) {
 	err := SaveConfig(Config{Profiles: map[string]Profile{}})
 	if err == nil {
 		t.Fatal("expected error when write fails")
+	}
+	if !strings.Contains(err.Error(), "/tmp/usercfg/ttscli/config.json.tmp") {
+		t.Errorf("expected error to include tmp file path, got: %v", err)
 	}
 }
 
@@ -331,6 +357,9 @@ func TestSaveConfigRenameErrorCleansUpTmp(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "finalize config file") {
 		t.Errorf("expected finalize error wrapping, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "/tmp/usercfg/ttscli/config.json") {
+		t.Errorf("expected error to include config path, got: %v", err)
 	}
 	if removed == "" || removed != writtenPath {
 		t.Errorf("expected tmp file %q to be removed, got %q", writtenPath, removed)
