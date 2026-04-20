@@ -210,7 +210,8 @@ func TestLoadConfigReadError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for read failure")
 	}
-	if !strings.Contains(err.Error(), "/tmp/usercfg/ttscli/config.json") {
+	expectedPath := filepath.FromSlash("/tmp/usercfg/ttscli/config.json")
+	if !strings.Contains(err.Error(), expectedPath) {
 		t.Errorf("expected error to include config path, got: %v", err)
 	}
 }
@@ -227,7 +228,8 @@ func TestLoadConfigParseError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
-	if !strings.Contains(err.Error(), "/tmp/usercfg/ttscli/config.json") {
+	expectedPath := filepath.FromSlash("/tmp/usercfg/ttscli/config.json")
+	if !strings.Contains(err.Error(), expectedPath) {
 		t.Errorf("expected error to include config path, got: %v", err)
 	}
 }
@@ -311,7 +313,8 @@ func TestSaveConfigMkdirError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when mkdir fails")
 	}
-	if !strings.Contains(err.Error(), "/tmp/usercfg/ttscli") {
+	expectedPath := filepath.FromSlash("/tmp/usercfg/ttscli")
+	if !strings.Contains(err.Error(), expectedPath) {
 		t.Errorf("expected error to include config dir path, got: %v", err)
 	}
 }
@@ -328,7 +331,8 @@ func TestSaveConfigWriteError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when write fails")
 	}
-	if !strings.Contains(err.Error(), "/tmp/usercfg/ttscli/config.json.tmp") {
+	expectedPath := filepath.FromSlash("/tmp/usercfg/ttscli/config.json.tmp")
+	if !strings.Contains(err.Error(), expectedPath) {
 		t.Errorf("expected error to include tmp file path, got: %v", err)
 	}
 }
@@ -358,7 +362,8 @@ func TestSaveConfigRenameErrorCleansUpTmp(t *testing.T) {
 	if !strings.Contains(err.Error(), "finalize config file") {
 		t.Errorf("expected finalize error wrapping, got: %v", err)
 	}
-	if !strings.Contains(err.Error(), "/tmp/usercfg/ttscli/config.json") {
+	expectedPath := filepath.FromSlash("/tmp/usercfg/ttscli/config.json")
+	if !strings.Contains(err.Error(), expectedPath) {
 		t.Errorf("expected error to include config path, got: %v", err)
 	}
 	if removed == "" || removed != writtenPath {
