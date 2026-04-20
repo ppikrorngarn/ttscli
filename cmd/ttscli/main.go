@@ -13,6 +13,8 @@ import (
 
 var runApp = app.Run
 
+// Build metadata injected at link time via ldflags.
+// Values default to "dev"/"none"/"unknown" for local builds.
 var (
 	version = "dev"
 	commit  = "none"
