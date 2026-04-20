@@ -1,8 +1,17 @@
 # Multi-Provider Text-to-Speech CLI (`ttscli`)
 
+[![CI](https://github.com/ppikrorngarn/ttscli/actions/workflows/ci.yml/badge.svg)](https://github.com/ppikrorngarn/ttscli/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/ppikrorngarn/ttscli.svg)](https://pkg.go.dev/github.com/ppikrorngarn/ttscli)
+[![License](https://img.shields.io/github/license/ppikrorngarn/ttscli)](LICENSE)
+[![Latest Release](https://img.shields.io/github/v/release/ppikrorngarn/ttscli)](https://github.com/ppikrorngarn/ttscli/releases/latest)
+
 A lightweight, fast Command Line Interface (CLI) written in Go to convert text into speech using multiple cloud TTS providers. Currently supports Google Cloud, with planned support for AWS, Azure, IBM Cloud, and Alibaba Cloud.
 
 This tool allows you to easily synthesize speech, save it to an MP3 file, or play it directly from your terminal on macOS, Linux, and Windows.
+
+## Privacy
+
+`ttscli` makes no network calls except to the TTS provider you configure (e.g., Google Cloud Text-to-Speech). No telemetry, no analytics, no phone-home. Your API key never leaves your machine except in requests to the provider's API endpoint.
 
 ## Prerequisites
 
