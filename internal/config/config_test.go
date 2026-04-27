@@ -234,6 +234,42 @@ func TestLoadConfigParseError(t *testing.T) {
 	}
 }
 
+func TestParseProfileKeyValid(t *testing.T) {
+	key, provider, name, err := ParseProfileKey("gcp:default")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if key != "gcp:default" || provider != "gcp" || name != "default" {
+		t.Fatalf("unexpected parse result: key=%q provider=%q name=%q", key, provider, name)
+	}
+}
+
+func TestParseProfileKeyInvalid(t *testing.T) {
+	tests := []string{"", "gcp", ":default", "gcp:", "gcp:work:extra"}
+	for _, raw := range tests {
+		_, _, _, err := ParseProfileKey(raw)
+		if err == nil {
+			t.Fatalf("expected error for %q", raw)
+		}
+		if !strings.Contains(err.Error(), "invalid profile key") {
+			t.Fatalf("expected invalid profile key error for %q, got: %v", raw, err)
+		}
+	}
+}
+
+func TestGetProfileRejectsInvalidProfileKey(t *testing.T) {
+	cfg := Config{
+		Profiles: map[string]Profile{
+			"gcp:default": {Provider: "gcp", Name: "default"},
+		},
+	}
+
+	_, err := GetProfile(cfg, "gcp")
+	if err == nil || !strings.Contains(err.Error(), "invalid profile key") {
+		t.Fatalf("expected invalid profile key error, got: %v", err)
+	}
+}
+
 // SaveConfig tests
 
 func TestSaveConfigSuccess(t *testing.T) {
