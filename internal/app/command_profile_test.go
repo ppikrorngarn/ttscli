@@ -132,6 +132,39 @@ func TestRunProfileCreateMissingName(t *testing.T) {
 	}
 }
 
+func TestRunProfileCreateRejectsInvalidProvider(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	cfg := cli.Config{Provider: "gc:p", ProfileName: "work", APIKey: "test-key"}
+	err := runProfileCreate(cfg, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "invalid provider") {
+		t.Fatalf("expected invalid provider error, got: %v", err)
+	}
+}
+
+func TestRunProfileCreateRejectsInvalidProfileName(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	cfg := cli.Config{Provider: "gcp", ProfileName: "wo:rk", APIKey: "test-key"}
+	err := runProfileCreate(cfg, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "invalid profile name") {
+		t.Fatalf("expected invalid profile name error, got: %v", err)
+	}
+}
+
+func TestRunProfileCreateRejectsWhitespaceOnlyName(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	cfg := cli.Config{Provider: "gcp", ProfileName: "   ", APIKey: "test-key"}
+	err := runProfileCreate(cfg, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "--name is required") {
+		t.Fatalf("expected name required error, got: %v", err)
+	}
+}
+
 func TestRunProfileCreateMissingAPIKey(t *testing.T) {
 	reset := stubAppDeps()
 	defer reset()

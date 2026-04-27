@@ -257,6 +257,36 @@ func TestParseProfileKeyInvalid(t *testing.T) {
 	}
 }
 
+func TestBuildProfileKeyValid(t *testing.T) {
+	key, provider, name, err := BuildProfileKey(" gcp ", " work ")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if key != "gcp:work" || provider != "gcp" || name != "work" {
+		t.Fatalf("unexpected build result: key=%q provider=%q name=%q", key, provider, name)
+	}
+}
+
+func TestBuildProfileKeyInvalid(t *testing.T) {
+	tests := []struct {
+		provider string
+		name     string
+		want     string
+	}{
+		{provider: "", name: "work", want: "provider is required"},
+		{provider: "gcp", name: "", want: "profile name is required"},
+		{provider: "gc:p", name: "work", want: "invalid provider"},
+		{provider: "gcp", name: "wo:rk", want: "invalid profile name"},
+	}
+
+	for _, tt := range tests {
+		_, _, _, err := BuildProfileKey(tt.provider, tt.name)
+		if err == nil || !strings.Contains(err.Error(), tt.want) {
+			t.Fatalf("expected %q error for provider=%q name=%q, got: %v", tt.want, tt.provider, tt.name, err)
+		}
+	}
+}
+
 func TestGetProfileRejectsInvalidProfileKey(t *testing.T) {
 	cfg := Config{
 		Profiles: map[string]Profile{
