@@ -279,8 +279,18 @@ func TestRunProfileUseInvalidFormat(t *testing.T) {
 	defer reset()
 
 	err := runProfileUse(cli.Config{Profile: "invalid-format"}, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "invalid profile format") {
+	if err == nil || !strings.Contains(err.Error(), "invalid profile key") {
 		t.Fatalf("expected invalid format error, got: %v", err)
+	}
+}
+
+func TestRunProfileDeleteInvalidFormat(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	err := runProfileDelete(cli.Config{Profile: "gcp"}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "invalid profile key") {
+		t.Fatalf("expected invalid profile key error, got: %v", err)
 	}
 }
 
@@ -315,6 +325,16 @@ func TestRunProfileGetNotFound(t *testing.T) {
 	err := runProfileGet(cli.Config{Profile: "gcp:nonexistent"}, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), `get profile "gcp:nonexistent"`) {
 		t.Fatalf("expected wrapped get profile error, got: %v", err)
+	}
+}
+
+func TestRunProfileGetInvalidFormat(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	err := runProfileGet(cli.Config{Profile: "gcp:"}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "invalid profile key") {
+		t.Fatalf("expected invalid profile key error, got: %v", err)
 	}
 }
 

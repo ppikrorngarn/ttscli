@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/ppikrorngarn/ttscli/internal/cli"
 	"github.com/ppikrorngarn/ttscli/internal/config"
@@ -152,13 +151,18 @@ func runProfileDelete(cfg cli.Config, stdout io.Writer) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	if _, exists := appCfg.Profiles[cfg.Profile]; !exists {
-		return fmt.Errorf("profile '%s' not found. Run 'ttscli profile list' to see available profiles", cfg.Profile)
+	profileKey, _, _, err := config.ParseProfileKey(cfg.Profile)
+	if err != nil {
+		return err
 	}
 
-	delete(appCfg.Profiles, cfg.Profile)
+	if _, exists := appCfg.Profiles[profileKey]; !exists {
+		return fmt.Errorf("profile '%s' not found. Run 'ttscli profile list' to see available profiles", profileKey)
+	}
 
-	if appCfg.ActiveProvider+":"+appCfg.ActiveProfile == cfg.Profile {
+	delete(appCfg.Profiles, profileKey)
+
+	if appCfg.ActiveProvider+":"+appCfg.ActiveProfile == profileKey {
 		appCfg.ActiveProvider = ""
 		appCfg.ActiveProfile = ""
 		for key, profile := range appCfg.Profiles {
@@ -176,7 +180,7 @@ func runProfileDelete(cfg cli.Config, stdout io.Writer) error {
 		return fmt.Errorf("save config: %w", err)
 	}
 
-	fmt.Fprintf(stdout, "✓ Profile deleted: %s\n", cfg.Profile)
+	fmt.Fprintf(stdout, "✓ Profile deleted: %s\n", profileKey)
 	return nil
 }
 
@@ -186,14 +190,10 @@ func runProfileUse(cfg cli.Config, stdout io.Writer) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	parts := strings.Split(cfg.Profile, ":")
-	if len(parts) != 2 {
-		return fmt.Errorf("invalid profile format. Expected 'provider:name' (e.g., gcp:default)")
+	profileKey, provider, name, err := config.ParseProfileKey(cfg.Profile)
+	if err != nil {
+		return err
 	}
-
-	provider := parts[0]
-	name := parts[1]
-	profileKey := cfg.Profile
 
 	if _, exists := appCfg.Profiles[profileKey]; !exists {
 		return fmt.Errorf("profile '%s' not found. Run 'ttscli profile list' to see available profiles", profileKey)
@@ -220,9 +220,14 @@ func runProfileGet(cfg cli.Config, stdout io.Writer) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	profile, err := getProfile(appCfg, cfg.Profile)
+	profileKey, _, _, err := config.ParseProfileKey(cfg.Profile)
 	if err != nil {
-		return fmt.Errorf("get profile %q: %w", cfg.Profile, err)
+		return err
+	}
+
+	profile, err := getProfile(appCfg, profileKey)
+	if err != nil {
+		return fmt.Errorf("get profile %q: %w", profileKey, err)
 	}
 
 	isActive := ""
@@ -232,7 +237,7 @@ func runProfileGet(cfg cli.Config, stdout io.Writer) error {
 
 	fmt.Fprintln(stdout, "Profile Details")
 	fmt.Fprintln(stdout, "───────────────")
-	fmt.Fprintf(stdout, "Profile Key:   %s%s\n", cfg.Profile, isActive)
+	fmt.Fprintf(stdout, "Profile Key:   %s%s\n", profileKey, isActive)
 	fmt.Fprintf(stdout, "Provider:      %s\n", profile.Provider)
 	fmt.Fprintf(stdout, "Name:          %s\n", profile.Name)
 	fmt.Fprintf(stdout, "API Key:       %s\n", maskAPIKey(resolveProfileAPIKey(profile)))
@@ -248,7 +253,7 @@ func runProfileGet(cfg cli.Config, stdout io.Writer) error {
 	}
 	fmt.Fprintln(stdout)
 	fmt.Fprintln(stdout, "Usage:")
-	fmt.Fprintf(stdout, "  ttscli speak --text \"Hello\" --profile %s\n", cfg.Profile)
-	fmt.Fprintf(stdout, "  ttscli save --text \"Hello\" --out speech.mp3 --profile %s\n", cfg.Profile)
+	fmt.Fprintf(stdout, "  ttscli speak --text \"Hello\" --profile %s\n", profileKey)
+	fmt.Fprintf(stdout, "  ttscli save --text \"Hello\" --out speech.mp3 --profile %s\n", profileKey)
 	return nil
 }

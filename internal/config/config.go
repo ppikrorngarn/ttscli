@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -138,9 +139,20 @@ func SaveConfig(cfg Config) error {
 }
 
 func GetProfile(cfg Config, profileKey string) (Profile, error) {
+	if _, _, _, err := ParseProfileKey(profileKey); err != nil {
+		return Profile{}, err
+	}
 	profile, ok := cfg.Profiles[profileKey]
 	if !ok {
 		return Profile{}, fmt.Errorf("profile %q not found", profileKey)
 	}
 	return profile, nil
+}
+
+func ParseProfileKey(raw string) (key, provider, name string, err error) {
+	parts := strings.Split(raw, ":")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", "", fmt.Errorf("invalid profile key %q. Expected 'provider:name' (e.g., gcp:default)", raw)
+	}
+	return raw, parts[0], parts[1], nil
 }

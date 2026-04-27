@@ -69,6 +69,20 @@ func TestRunProfileFlag(t *testing.T) {
 	}
 }
 
+func TestRunProfileFlagInvalidFormat(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	parseArgs = func(args []string, stderr io.Writer) (cli.Config, error) {
+		return cli.Config{Mode: cli.ModeVoices, ListVoices: true, Lang: "en-US", Profile: "gcp"}, nil
+	}
+
+	err := Run([]string{"voices", "--profile", "gcp"}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "invalid profile key") {
+		t.Fatalf("expected invalid profile key error, got: %v", err)
+	}
+}
+
 func TestRunSynthesizeError(t *testing.T) {
 	reset := stubAppDeps()
 	defer reset()

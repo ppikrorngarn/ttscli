@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/ppikrorngarn/ttscli/internal/cli"
+	"github.com/ppikrorngarn/ttscli/internal/config"
 	"github.com/ppikrorngarn/ttscli/internal/tts"
 )
 
@@ -42,7 +43,11 @@ func Run(args []string, stdout, stderr io.Writer) error {
 	// Determine which profile to use
 	var profileKey string
 	if cfg.Profile != "" {
-		profileKey = cfg.Profile
+		var err error
+		profileKey, _, _, err = config.ParseProfileKey(cfg.Profile)
+		if err != nil {
+			return err
+		}
 	} else {
 		// Use active profile from config
 		if appCfg.ActiveProvider == "" || appCfg.ActiveProfile == "" {
