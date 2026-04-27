@@ -62,7 +62,6 @@ type Config struct {
 	ListVoices        bool
 	HasVoiceFlag      bool
 	HasLangFlag       bool
-	HasAPIKeyFlag     bool
 	DefaultSubcommand string
 	Profile           string
 	Provider          string
