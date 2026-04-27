@@ -319,6 +319,20 @@ func TestSaveConfigMkdirError(t *testing.T) {
 	}
 }
 
+func TestSaveConfigPathError(t *testing.T) {
+	reset := stubConfigDeps()
+	defer reset()
+
+	userConfigDir = func() (string, error) {
+		return "", errors.New("config dir failed")
+	}
+
+	err := SaveConfig(Config{Profiles: map[string]Profile{}})
+	if err == nil || !strings.Contains(err.Error(), "resolve config path") {
+		t.Fatalf("expected resolve config path error, got: %v", err)
+	}
+}
+
 func TestSaveConfigWriteError(t *testing.T) {
 	reset := stubConfigDeps()
 	defer reset()

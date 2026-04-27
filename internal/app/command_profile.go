@@ -222,7 +222,7 @@ func runProfileGet(cfg cli.Config, stdout io.Writer) error {
 
 	profile, err := getProfile(appCfg, cfg.Profile)
 	if err != nil {
-		return err
+		return fmt.Errorf("get profile %q: %w", cfg.Profile, err)
 	}
 
 	isActive := ""

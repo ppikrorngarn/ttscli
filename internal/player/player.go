@@ -44,7 +44,7 @@ func PlayAudio(audioBytes []byte, stdout, stderr io.Writer) error {
 
 	cmd, err := playCommand(currentGOOS(), tmpFilePath, lookPathCmd)
 	if err != nil {
-		return err
+		return fmt.Errorf("build player command: %w", err)
 	}
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
