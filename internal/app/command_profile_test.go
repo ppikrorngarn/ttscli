@@ -313,8 +313,8 @@ func TestRunProfileGetNotFound(t *testing.T) {
 	defer reset()
 
 	err := runProfileGet(cli.Config{Profile: "gcp:nonexistent"}, &bytes.Buffer{})
-	if err == nil {
-		t.Fatal("expected error for missing profile")
+	if err == nil || !strings.Contains(err.Error(), `get profile "gcp:nonexistent"`) {
+		t.Fatalf("expected wrapped get profile error, got: %v", err)
 	}
 }
 

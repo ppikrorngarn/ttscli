@@ -158,8 +158,8 @@ func TestPlayAudioBuildCommandError(t *testing.T) {
 	}
 
 	err := PlayAudio([]byte("audio"), &bytes.Buffer{}, &bytes.Buffer{})
-	if err == nil {
-		t.Fatal("expected build command error")
+	if err == nil || !strings.Contains(err.Error(), "build player command") {
+		t.Fatalf("expected build player command error, got: %v", err)
 	}
 }
 

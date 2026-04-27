@@ -113,7 +113,7 @@ func LoadConfig() (Config, error) {
 func SaveConfig(cfg Config) error {
 	path, err := Path()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve config path: %w", err)
 	}
 	if err := mkdirAll(filepath.Dir(path), dirPermission); err != nil {
 		return fmt.Errorf("create config dir (%s): %w", filepath.Dir(path), err)
