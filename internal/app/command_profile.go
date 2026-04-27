@@ -94,7 +94,7 @@ func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
 	}
 
 	if _, exists := appCfg.Profiles[profileKey]; exists {
-		return fmt.Errorf("profile '%s' already exists. Choose a different name or delete it first", profileKey)
+		return fmt.Errorf("profile %q already exists. Choose a different name or delete it first", profileKey)
 	}
 
 	profile := config.Profile{
@@ -162,7 +162,7 @@ func runProfileDelete(cfg cli.Config, stdout io.Writer) error {
 	}
 
 	if _, exists := appCfg.Profiles[profileKey]; !exists {
-		return fmt.Errorf("profile '%s' not found. Run 'ttscli profile list' to see available profiles", profileKey)
+		return fmt.Errorf("profile %q not found. Run 'ttscli profile list' to see available profiles", profileKey)
 	}
 
 	delete(appCfg.Profiles, profileKey)
@@ -201,7 +201,7 @@ func runProfileUse(cfg cli.Config, stdout io.Writer) error {
 	}
 
 	if _, exists := appCfg.Profiles[profileKey]; !exists {
-		return fmt.Errorf("profile '%s' not found. Run 'ttscli profile list' to see available profiles", profileKey)
+		return fmt.Errorf("profile %q not found. Run 'ttscli profile list' to see available profiles", profileKey)
 	}
 
 	appCfg.ActiveProvider = provider
@@ -230,9 +230,9 @@ func runProfileGet(cfg cli.Config, stdout io.Writer) error {
 		return err
 	}
 
-	profile, err := getProfile(appCfg, profileKey)
-	if err != nil {
-		return fmt.Errorf("get profile %q: %w", profileKey, err)
+	profile, exists := appCfg.Profiles[profileKey]
+	if !exists {
+		return fmt.Errorf("profile %q not found. Run 'ttscli profile list' to see available profiles", profileKey)
 	}
 
 	isActive := ""

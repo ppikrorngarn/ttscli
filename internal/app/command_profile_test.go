@@ -105,8 +105,9 @@ func TestRunProfileCreateAlreadyExists(t *testing.T) {
 	// stubAppDeps has gcp:default — try to create it again.
 	cfg := cli.Config{Provider: "gcp", ProfileName: "default", APIKey: "test-key"}
 	err := runProfileCreate(cfg, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "already exists") {
-		t.Fatalf("expected already exists error, got: %v", err)
+	want := `profile "gcp:default" already exists. Choose a different name or delete it first`
+	if err == nil || err.Error() != want {
+		t.Fatalf("expected %q, got: %v", want, err)
 	}
 }
 
@@ -203,8 +204,9 @@ func TestRunProfileDeleteNotFound(t *testing.T) {
 	defer reset()
 
 	err := runProfileDelete(cli.Config{Profile: "gcp:nonexistent"}, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "not found") {
-		t.Fatalf("expected not found error, got: %v", err)
+	want := `profile "gcp:nonexistent" not found. Run 'ttscli profile list' to see available profiles`
+	if err == nil || err.Error() != want {
+		t.Fatalf("expected %q, got: %v", want, err)
 	}
 }
 
@@ -332,8 +334,9 @@ func TestRunProfileUseNotFound(t *testing.T) {
 	defer reset()
 
 	err := runProfileUse(cli.Config{Profile: "gcp:nonexistent"}, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "not found") {
-		t.Fatalf("expected not found error, got: %v", err)
+	want := `profile "gcp:nonexistent" not found. Run 'ttscli profile list' to see available profiles`
+	if err == nil || err.Error() != want {
+		t.Fatalf("expected %q, got: %v", want, err)
 	}
 }
 
@@ -356,8 +359,9 @@ func TestRunProfileGetNotFound(t *testing.T) {
 	defer reset()
 
 	err := runProfileGet(cli.Config{Profile: "gcp:nonexistent"}, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), `get profile "gcp:nonexistent"`) {
-		t.Fatalf("expected wrapped get profile error, got: %v", err)
+	want := `profile "gcp:nonexistent" not found. Run 'ttscli profile list' to see available profiles`
+	if err == nil || err.Error() != want {
+		t.Fatalf("expected %q, got: %v", want, err)
 	}
 }
 
