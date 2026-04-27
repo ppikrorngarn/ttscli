@@ -130,23 +130,22 @@ func parseCompletionCommand(args []string) (Config, error) {
 	return cfg, nil
 }
 
-func parseSpeakCommand(args []string, stderr io.Writer) (Config, error) {
-	cfg := Config{Mode: ModeSpeak}
-	fs := flag.NewFlagSet(appName+" speak", flag.ContinueOnError)
-	fs.SetOutput(stderr)
+func addLangFlag(fs *flag.FlagSet, target *string, usage string) {
+	fs.StringVar(target, "lang", DefaultLanguage, usage)
+	fs.StringVar(target, "l", DefaultLanguage, "Language code (shorthand)")
+}
 
-	fs.StringVar(&cfg.Text, "text", "", "Text to convert to speech")
-	fs.StringVar(&cfg.Text, "t", "", "Text to convert to speech (shorthand)")
-	fs.StringVar(&cfg.Lang, "lang", DefaultLanguage, "Language code (e.g., en-US, en-GB, fr-FR)")
-	fs.StringVar(&cfg.Lang, "l", DefaultLanguage, "Language code (shorthand)")
-	fs.StringVar(&cfg.Voice, "voice", DefaultVoice, "Voice name for synthesis")
-	fs.StringVar(&cfg.Voice, "v", DefaultVoice, "Voice name (shorthand)")
-	fs.StringVar(&cfg.Profile, "profile", "", "Profile to use (e.g., gcp:default)")
-	fs.StringVar(&cfg.Profile, "p", "", "Profile to use (shorthand)")
+func addVoiceFlag(fs *flag.FlagSet, target *string, usage string) {
+	fs.StringVar(target, "voice", DefaultVoice, usage)
+	fs.StringVar(target, "v", DefaultVoice, "Voice name (shorthand)")
+}
 
-	if err := fs.Parse(args); err != nil {
-		return cfg, err
-	}
+func addProfileFlag(fs *flag.FlagSet, target *string) {
+	fs.StringVar(target, "profile", "", "Profile to use (e.g., gcp:default)")
+	fs.StringVar(target, "p", "", "Profile to use (shorthand)")
+}
+
+func markExplicitSpeechFlags(fs *flag.FlagSet, cfg *Config) {
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "voice", "v":
@@ -155,6 +154,31 @@ func parseSpeakCommand(args []string, stderr io.Writer) (Config, error) {
 			cfg.HasLangFlag = true
 		}
 	})
+}
+
+func markExplicitVoiceListFlags(fs *flag.FlagSet, cfg *Config) {
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "lang" || f.Name == "l" {
+			cfg.HasLangFlag = true
+		}
+	})
+}
+
+func parseSpeakCommand(args []string, stderr io.Writer) (Config, error) {
+	cfg := Config{Mode: ModeSpeak}
+	fs := flag.NewFlagSet(appName+" speak", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+
+	fs.StringVar(&cfg.Text, "text", "", "Text to convert to speech")
+	fs.StringVar(&cfg.Text, "t", "", "Text to convert to speech (shorthand)")
+	addLangFlag(fs, &cfg.Lang, "Language code (e.g., en-US, en-GB, fr-FR)")
+	addVoiceFlag(fs, &cfg.Voice, "Voice name for synthesis")
+	addProfileFlag(fs, &cfg.Profile)
+
+	if err := fs.Parse(args); err != nil {
+		return cfg, err
+	}
+	markExplicitSpeechFlags(fs, &cfg)
 
 	if fs.NArg() > 0 {
 		return cfg, fmt.Errorf("unexpected arguments: %s. Use --text or -t to provide text", strings.Join(fs.Args(), " "))
@@ -175,24 +199,14 @@ func parseSaveCommand(args []string, stderr io.Writer) (Config, error) {
 	fs.StringVar(&cfg.Text, "t", "", "Text to convert to speech (shorthand)")
 	fs.StringVar(&cfg.SavePath, "out", "", "Path to save the output MP3 file (e.g., output.mp3)")
 	fs.StringVar(&cfg.SavePath, "o", "", "Path to save the output MP3 file (shorthand)")
-	fs.StringVar(&cfg.Lang, "lang", DefaultLanguage, "Language code (e.g., en-US, en-GB, fr-FR)")
-	fs.StringVar(&cfg.Lang, "l", DefaultLanguage, "Language code (shorthand)")
-	fs.StringVar(&cfg.Voice, "voice", DefaultVoice, "Voice name for synthesis")
-	fs.StringVar(&cfg.Voice, "v", DefaultVoice, "Voice name (shorthand)")
-	fs.StringVar(&cfg.Profile, "profile", "", "Profile to use (e.g., gcp:default)")
-	fs.StringVar(&cfg.Profile, "p", "", "Profile to use (shorthand)")
+	addLangFlag(fs, &cfg.Lang, "Language code (e.g., en-US, en-GB, fr-FR)")
+	addVoiceFlag(fs, &cfg.Voice, "Voice name for synthesis")
+	addProfileFlag(fs, &cfg.Profile)
 
 	if err := fs.Parse(args); err != nil {
 		return cfg, err
 	}
-	fs.Visit(func(f *flag.Flag) {
-		switch f.Name {
-		case "voice", "v":
-			cfg.HasVoiceFlag = true
-		case "lang", "l":
-			cfg.HasLangFlag = true
-		}
-	})
+	markExplicitSpeechFlags(fs, &cfg)
 
 	if fs.NArg() > 0 {
 		return cfg, fmt.Errorf("unexpected arguments: %s. Use --text/-t and --out/-o", strings.Join(fs.Args(), " "))
@@ -210,19 +224,13 @@ func parseVoicesCommand(args []string, stderr io.Writer) (Config, error) {
 	cfg := Config{Mode: ModeVoices}
 	fs := flag.NewFlagSet(appName+" voices", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	fs.StringVar(&cfg.Lang, "lang", DefaultLanguage, "Language code to filter voices (e.g., en-US, en-GB)")
-	fs.StringVar(&cfg.Lang, "l", DefaultLanguage, "Language code (shorthand)")
-	fs.StringVar(&cfg.Profile, "profile", "", "Profile to use (e.g., gcp:default)")
-	fs.StringVar(&cfg.Profile, "p", "", "Profile to use (shorthand)")
+	addLangFlag(fs, &cfg.Lang, "Language code to filter voices (e.g., en-US, en-GB)")
+	addProfileFlag(fs, &cfg.Profile)
 
 	if err := fs.Parse(args); err != nil {
 		return cfg, err
 	}
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "lang" || f.Name == "l" {
-			cfg.HasLangFlag = true
-		}
-	})
+	markExplicitVoiceListFlags(fs, &cfg)
 
 	if fs.NArg() > 0 {
 		return cfg, fmt.Errorf("unexpected arguments: %s. Use --lang or -l to filter by language", strings.Join(fs.Args(), " "))
