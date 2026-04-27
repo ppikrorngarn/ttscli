@@ -37,7 +37,11 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 			profileName = "default"
 		}
 
-		profileKey = "gcp:" + profileName
+		var buildErr error
+		profileKey, _, profileName, buildErr = config.BuildProfileKey("gcp", profileName)
+		if buildErr != nil {
+			return buildErr
+		}
 		if _, exists := appCfg.Profiles[profileKey]; exists {
 			fmt.Fprintf(stdout, "Profile '%s' already exists.\n", profileKey)
 			fmt.Fprintf(stdout, "Tip: Use 'ttscli profile use %s' to activate it.\n", profileKey)
@@ -144,7 +148,7 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("resolve config path: %w", err)
 	}
-	
+
 	fmt.Fprintln(stdout)
 	fmt.Fprintln(stdout, "✓ Setup complete!")
 	fmt.Fprintln(stdout)

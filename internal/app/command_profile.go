@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/ppikrorngarn/ttscli/internal/cli"
 	"github.com/ppikrorngarn/ttscli/internal/config"
@@ -72,14 +73,19 @@ func runProfileList(stdout io.Writer) error {
 }
 
 func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
-	if cfg.Provider == "" {
+	if strings.TrimSpace(cfg.Provider) == "" {
 		return fmt.Errorf("--provider is required. Specify the TTS provider (gcp, aws, azure, ibm, alibaba)")
 	}
-	if cfg.ProfileName == "" {
+	if strings.TrimSpace(cfg.ProfileName) == "" {
 		return fmt.Errorf("--name is required. Choose a unique name for this profile")
 	}
 	if cfg.APIKey == "" {
 		return fmt.Errorf("--api-key is required. Get your API key from the provider's console")
+	}
+
+	profileKey, providerName, profileName, err := config.BuildProfileKey(cfg.Provider, cfg.ProfileName)
+	if err != nil {
+		return err
 	}
 
 	appCfg, err := loadConfig()
@@ -87,14 +93,13 @@ func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	profileKey := cfg.Provider + ":" + cfg.ProfileName
 	if _, exists := appCfg.Profiles[profileKey]; exists {
 		return fmt.Errorf("profile '%s' already exists. Choose a different name or delete it first", profileKey)
 	}
 
 	profile := config.Profile{
-		Provider: cfg.Provider,
-		Name:     cfg.ProfileName,
+		Provider: providerName,
+		Name:     profileName,
 		Credentials: map[string]interface{}{
 			"apiKey": cfg.APIKey,
 		},

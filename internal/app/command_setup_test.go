@@ -77,6 +77,18 @@ func TestRunSetupCommandProfileAlreadyExists(t *testing.T) {
 	}
 }
 
+func TestRunSetupCommandRejectsInvalidProfileName(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	setupInput = strings.NewReader("bad:name\n")
+
+	err := runSetupCommand(&bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "invalid profile name") {
+		t.Fatalf("expected invalid profile name error, got: %v", err)
+	}
+}
+
 func TestRunSetupCommandVoiceNotAvailable(t *testing.T) {
 	reset := stubAppDeps()
 	defer reset()

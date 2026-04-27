@@ -156,3 +156,23 @@ func ParseProfileKey(raw string) (key, provider, name string, err error) {
 	}
 	return raw, parts[0], parts[1], nil
 }
+
+func BuildProfileKey(provider, name string) (key, normalizedProvider, normalizedName string, err error) {
+	normalizedProvider = strings.TrimSpace(provider)
+	normalizedName = strings.TrimSpace(name)
+
+	if normalizedProvider == "" {
+		return "", "", "", fmt.Errorf("provider is required")
+	}
+	if normalizedName == "" {
+		return "", "", "", fmt.Errorf("profile name is required")
+	}
+	if strings.Contains(normalizedProvider, ":") {
+		return "", "", "", fmt.Errorf("invalid provider %q. Provider names must not contain ':'", normalizedProvider)
+	}
+	if strings.Contains(normalizedName, ":") {
+		return "", "", "", fmt.Errorf("invalid profile name %q. Profile names must not contain ':'", normalizedName)
+	}
+
+	return normalizedProvider + ":" + normalizedName, normalizedProvider, normalizedName, nil
+}
