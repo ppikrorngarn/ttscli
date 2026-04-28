@@ -84,8 +84,28 @@ func TestTTSClientSynthesizeErrorStatus(t *testing.T) {
 	c.baseURL = srv.URL
 
 	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
-	if err == nil || !strings.Contains(err.Error(), "status=400") {
-		t.Fatalf("expected status error, got: %v", err)
+	want := "tts request failed with status 400"
+	if err == nil || err.Error() != want {
+		t.Fatalf("expected %q, got: %v", want, err)
+	}
+}
+
+func TestTTSClientSynthesizeErrorStatusStructuredMessage(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertAPIKeyHeader(t, r)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, `{"error":{"message":"API key not valid"}}`)
+	}))
+	defer srv.Close()
+
+	c := NewClient("k", srv.Client())
+	c.baseURL = srv.URL
+
+	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
+	want := "tts request failed with status 400: API key not valid"
+	if err == nil || err.Error() != want {
+		t.Fatalf("expected %q, got: %v", want, err)
 	}
 }
 
@@ -286,8 +306,72 @@ func TestTTSClientListVoicesErrorStatus(t *testing.T) {
 	c.baseURL = srv.URL
 
 	_, err := c.ListVoices(context.Background(), "en-US")
-	if err == nil || !strings.Contains(err.Error(), "status=401") {
-		t.Fatalf("expected status error, got: %v", err)
+	want := "tts request failed with status 401"
+	if err == nil || err.Error() != want {
+		t.Fatalf("expected %q, got: %v", want, err)
+	}
+}
+
+func TestTTSClientListVoicesErrorStatusTopLevelMessage(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertAPIKeyHeader(t, r)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		fmt.Fprint(w, `{"message":"quota exceeded"}`)
+	}))
+	defer srv.Close()
+
+	c := NewClient("k", srv.Client())
+	c.baseURL = srv.URL
+
+	_, err := c.ListVoices(context.Background(), "en-US")
+	want := "tts request failed with status 429: quota exceeded"
+	if err == nil || err.Error() != want {
+		t.Fatalf("expected %q, got: %v", want, err)
+	}
+}
+
+func TestTTSClientListVoicesErrorStatusStringError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertAPIKeyHeader(t, r)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, `{"error":"unauthorized"}`)
+	}))
+	defer srv.Close()
+
+	c := NewClient("k", srv.Client())
+	c.baseURL = srv.URL
+
+	_, err := c.ListVoices(context.Background(), "en-US")
+	want := "tts request failed with status 401: unauthorized"
+	if err == nil || err.Error() != want {
+		t.Fatalf("expected %q, got: %v", want, err)
+	}
+}
+
+func TestTTSClientSynthesizeErrorStatusDoesNotLeakResponseBody(t *testing.T) {
+	const secret = "tts-sentinel-secret-98765"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertAPIKeyHeader(t, r)
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprint(w, secret)
+	}))
+	defer srv.Close()
+
+	c := NewClient("k", srv.Client())
+	c.baseURL = srv.URL
+
+	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
+	if err == nil {
+		t.Fatal("expected status error")
+	}
+	if strings.Contains(err.Error(), secret) {
+		t.Fatalf("response body leaked into error: %v", err)
+	}
+	if err.Error() != "tts request failed with status 403" {
+		t.Fatalf("expected status-only fallback, got: %v", err)
 	}
 }
 

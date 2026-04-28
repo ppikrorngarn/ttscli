@@ -193,9 +193,58 @@ func (c *Client) do(req *http.Request) ([]byte, error) {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, fmt.Errorf("status=%d body=%s", resp.StatusCode, string(body))
+		return nil, formatAPIError(resp.StatusCode, body)
 	}
 	return body, nil
+}
+
+func formatAPIError(statusCode int, body []byte) error {
+	message := extractAPIErrorMessage(body)
+	if message == "" {
+		return fmt.Errorf("tts request failed with status %d", statusCode)
+	}
+	return fmt.Errorf("tts request failed with status %d: %s", statusCode, message)
+}
+
+func extractAPIErrorMessage(body []byte) string {
+	var parsed struct {
+		Error   json.RawMessage `json:"error"`
+		Message string          `json:"message"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return ""
+	}
+
+	if message := extractNestedErrorMessage(parsed.Error); message != "" {
+		return message
+	}
+	for _, candidate := range []string{
+		parsed.Message,
+		stringValue(parsed.Error),
+	} {
+		if message := strings.TrimSpace(candidate); message != "" {
+			return message
+		}
+	}
+	return ""
+}
+
+func extractNestedErrorMessage(raw json.RawMessage) string {
+	var nested struct {
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(raw, &nested); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(nested.Message)
+}
+
+func stringValue(raw json.RawMessage) string {
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(value)
 }
 
 func PrintVoices(w io.Writer, langCode string, voices []Voice) {
