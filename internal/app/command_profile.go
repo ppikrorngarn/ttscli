@@ -83,7 +83,9 @@ func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
 		return fmt.Errorf("--api-key is required. Get your API key from the provider's console")
 	}
 
-	profileKey, providerName, profileName, err := config.BuildProfileKey(cfg.Provider, cfg.ProfileName)
+	normalizedProvider := strings.ToLower(strings.TrimSpace(cfg.Provider))
+
+	profileKey, providerName, profileName, err := config.BuildProfileKey(normalizedProvider, cfg.ProfileName)
 	if err != nil {
 		return err
 	}
