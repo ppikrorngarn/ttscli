@@ -184,6 +184,48 @@ func TestRunProfileCreateRejectsInvalidProvider(t *testing.T) {
 	}
 }
 
+func TestRunProfileCreateRejectsUnimplementedProvider(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	providerCalled := false
+	newProvider = func(profile config.Profile) (tts.Provider, error) {
+		providerCalled = true
+		return nil, nil
+	}
+
+	cfg := cli.Config{Provider: "aws", ProfileName: "work", APIKey: "test-key"}
+	err := runProfileCreate(cfg, &bytes.Buffer{})
+	want := `provider "aws" is not yet implemented. Available today: gcp`
+	if err == nil || err.Error() != want {
+		t.Fatalf("expected %q, got: %v", want, err)
+	}
+	if providerCalled {
+		t.Fatal("expected provider initialization to be skipped for unimplemented provider")
+	}
+}
+
+func TestRunProfileCreateRejectsUnknownProvider(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	providerCalled := false
+	newProvider = func(profile config.Profile) (tts.Provider, error) {
+		providerCalled = true
+		return nil, nil
+	}
+
+	cfg := cli.Config{Provider: "openai", ProfileName: "work", APIKey: "test-key"}
+	err := runProfileCreate(cfg, &bytes.Buffer{})
+	want := `unsupported provider "openai". Supported providers: gcp`
+	if err == nil || err.Error() != want {
+		t.Fatalf("expected %q, got: %v", want, err)
+	}
+	if providerCalled {
+		t.Fatal("expected provider initialization to be skipped for unsupported provider")
+	}
+}
+
 func TestRunProfileCreateRejectsInvalidProfileName(t *testing.T) {
 	reset := stubAppDeps()
 	defer reset()

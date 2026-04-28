@@ -89,6 +89,9 @@ func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if err := validateProfileCreateProvider(providerName); err != nil {
+		return err
+	}
 
 	appCfg, err := loadConfig()
 	if err != nil {
@@ -150,6 +153,17 @@ func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
 	fmt.Fprintf(stdout, "  ttscli speak --text \"Hello\" --profile %s\n", profileKey)
 	fmt.Fprintf(stdout, "  ttscli profile use %s\n", profileKey)
 	return nil
+}
+
+func validateProfileCreateProvider(provider string) error {
+	switch provider {
+	case "gcp":
+		return nil
+	case "aws", "azure", "ibm", "alibaba":
+		return fmt.Errorf("provider %q is not yet implemented. Available today: gcp", provider)
+	default:
+		return fmt.Errorf("unsupported provider %q. Supported providers: gcp", provider)
+	}
 }
 
 func runProfileDelete(cfg cli.Config, stdout io.Writer) error {
