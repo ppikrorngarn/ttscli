@@ -98,6 +98,46 @@ func TestRunProfileCreateSuccess(t *testing.T) {
 	}
 }
 
+func TestRunProfileCreateNormalizesProviderName(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	loadConfig = func() (config.Config, error) {
+		return config.Config{Profiles: map[string]config.Profile{}}, nil
+	}
+	newProvider = func(profile config.Profile) (tts.Provider, error) {
+		if profile.Provider != "gcp" {
+			t.Fatalf("expected normalized provider gcp, got %q", profile.Provider)
+		}
+		return &fakeTTSClient{
+			listVoicesFn: func(ctx context.Context, lang string) ([]tts.Voice, error) {
+				return []tts.Voice{{Name: "en-US-Neural2-F"}}, nil
+			},
+			synthesizeFn: func(ctx context.Context, text, lang, voice, enc string) ([]byte, error) {
+				return nil, nil
+			},
+		}, nil
+	}
+
+	var saved config.Config
+	saveConfig = func(cfg config.Config) error {
+		saved = cfg
+		return nil
+	}
+
+	var stdout bytes.Buffer
+	cfg := cli.Config{Provider: " GCP ", ProfileName: "work", APIKey: "test-key"}
+	if err := runProfileCreate(cfg, &stdout); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, exists := saved.Profiles["gcp:work"]; !exists {
+		t.Fatalf("expected normalized profile key gcp:work in saved config, got: %#v", saved.Profiles)
+	}
+	if !strings.Contains(stdout.String(), "Profile created: gcp:work") {
+		t.Errorf("expected normalized creation message, got: %q", stdout.String())
+	}
+}
+
 func TestRunProfileCreateAlreadyExists(t *testing.T) {
 	reset := stubAppDeps()
 	defer reset()
