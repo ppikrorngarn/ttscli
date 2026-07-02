@@ -21,6 +21,8 @@ func runProfileCommand(cfg cli.Config, stdout io.Writer) error {
 		return runProfileUse(cfg, stdout)
 	case cli.ProfileGet:
 		return runProfileGet(cfg, stdout)
+	case cli.ProfileSet:
+		return runProfileSet(cfg, stdout)
 	default:
 		return fmt.Errorf("unsupported profile subcommand: %s", cfg.DefaultSubcommand)
 	}
@@ -232,6 +234,50 @@ func runProfileUse(cfg cli.Config, stdout io.Writer) error {
 	fmt.Fprintln(stdout, "You can now use TTS commands without specifying --profile:")
 	fmt.Fprintln(stdout, "  ttscli speak --text \"Hello world\"")
 	fmt.Fprintln(stdout, "  ttscli voices")
+	return nil
+}
+
+func runProfileSet(cfg cli.Config, stdout io.Writer) error {
+	appCfg, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	profileKey, _, _, err := config.ParseProfileKey(cfg.Profile)
+	if err != nil {
+		return err
+	}
+
+	profile, exists := appCfg.Profiles[profileKey]
+	if !exists {
+		return fmt.Errorf("profile %q not found. Run 'ttscli profile list' to see available profiles", profileKey)
+	}
+
+	if profile.Defaults == nil {
+		profile.Defaults = make(map[string]string)
+	}
+
+	if cfg.DefaultVoice != "" {
+		profile.Defaults["voice"] = cfg.DefaultVoice
+	}
+	if cfg.DefaultLang != "" {
+		profile.Defaults["lang"] = cfg.DefaultLang
+	}
+
+	appCfg.Profiles[profileKey] = profile
+	if err := saveConfig(appCfg); err != nil {
+		return fmt.Errorf("save config: %w", err)
+	}
+
+	fmt.Fprintf(stdout, "✓ Profile updated: %s\n", profileKey)
+	if cfg.DefaultVoice != "" {
+		fmt.Fprintf(stdout, "  Default voice → %s\n", cfg.DefaultVoice)
+	}
+	if cfg.DefaultLang != "" {
+		fmt.Fprintf(stdout, "  Default lang  → %s\n", cfg.DefaultLang)
+	}
+	fmt.Fprintln(stdout)
+	fmt.Fprintf(stdout, "Run 'ttscli speak --text \"Hello\"' to use the new default.\n")
 	return nil
 }
 

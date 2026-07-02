@@ -36,6 +36,7 @@ const (
 	ProfileDelete         = "delete"
 	ProfileUse            = "use"
 	ProfileGet            = "get"
+	ProfileSet            = "set"
 )
 
 var supportedCompletionShells = map[string]struct{}{
@@ -61,6 +62,7 @@ type Config struct {
 	Provider          string
 	ProfileName       string
 	DefaultVoice      string
+	DefaultLang       string
 }
 
 func ParseArgs(args []string, stderr io.Writer) (Config, error) {
@@ -283,7 +285,7 @@ func printHelp(stderr io.Writer) {
 func parseProfileCommand(args []string, stderr io.Writer) (Config, error) {
 	cfg := Config{Mode: ModeProfile}
 	if len(args) == 0 {
-		return cfg, fmt.Errorf("profile subcommand required. Use: list, create, delete, use, or get. Run 'ttscli profile --help' for details")
+		return cfg, fmt.Errorf("profile subcommand required. Use: list, create, delete, use, get, or set. Run 'ttscli profile --help' for details")
 	}
 
 	subcommand := args[0]
@@ -340,7 +342,28 @@ func parseProfileCommand(args []string, stderr io.Writer) (Config, error) {
 		}
 		cfg.Profile = args[1]
 		return cfg, nil
+	case ProfileSet:
+		if len(args) < 2 {
+			return cfg, fmt.Errorf("profile key required. Usage: ttscli profile set gcp:default --voice en-US-Chirp3-HD-Kore")
+		}
+		cfg.Profile = args[1]
+		fs := flag.NewFlagSet(appName+" profile set", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		fs.StringVar(&cfg.DefaultVoice, "voice", "", "Default voice for this profile")
+		fs.StringVar(&cfg.DefaultVoice, "v", "", "Default voice (shorthand)")
+		fs.StringVar(&cfg.DefaultLang, "lang", "", "Default language for this profile")
+		fs.StringVar(&cfg.DefaultLang, "l", "", "Default language (shorthand)")
+		if err := fs.Parse(args[2:]); err != nil {
+			return cfg, err
+		}
+		if fs.NArg() > 0 {
+			return cfg, fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
+		}
+		if cfg.DefaultVoice == "" && cfg.DefaultLang == "" {
+			return cfg, fmt.Errorf("at least one flag required: --voice or --lang")
+		}
+		return cfg, nil
 	default:
-		return cfg, fmt.Errorf("unknown profile subcommand %q. Use: list, create, delete, use, or get", subcommand)
+		return cfg, fmt.Errorf("unknown profile subcommand %q. Use: list, create, delete, use, get, or set", subcommand)
 	}
 }
