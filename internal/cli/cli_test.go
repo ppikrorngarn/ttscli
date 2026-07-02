@@ -518,3 +518,72 @@ func TestParseCLIArgsProfileUnsupportedSubcommand(t *testing.T) {
 		t.Fatalf("expected unsupported subcommand error, got: %v", err)
 	}
 }
+
+func TestParseCLIArgsProfileSet(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"profile", "set", "gcp:default", "--voice", "en-US-Chirp3-HD-Kore"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Mode != ModeProfile || cfg.DefaultSubcommand != ProfileSet {
+		t.Errorf("unexpected mode/subcommand: %+v", cfg)
+	}
+	if cfg.Profile != "gcp:default" {
+		t.Errorf("expected profile gcp:default, got %q", cfg.Profile)
+	}
+	if cfg.DefaultVoice != "en-US-Chirp3-HD-Kore" {
+		t.Errorf("expected voice en-US-Chirp3-HD-Kore, got %q", cfg.DefaultVoice)
+	}
+}
+
+func TestParseCLIArgsProfileSetWithLang(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"profile", "set", "gcp:default", "--voice", "en-US-Chirp3-HD-Kore", "--lang", "en-US"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.DefaultVoice != "en-US-Chirp3-HD-Kore" {
+		t.Errorf("expected voice en-US-Chirp3-HD-Kore, got %q", cfg.DefaultVoice)
+	}
+	if cfg.DefaultLang != "en-US" {
+		t.Errorf("expected lang en-US, got %q", cfg.DefaultLang)
+	}
+}
+
+func TestParseCLIArgsProfileSetShorthandFlags(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"profile", "set", "gcp:default", "-v", "en-US-Chirp3-HD-Kore", "-l", "en-US"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.DefaultVoice != "en-US-Chirp3-HD-Kore" {
+		t.Errorf("expected voice en-US-Chirp3-HD-Kore, got %q", cfg.DefaultVoice)
+	}
+	if cfg.DefaultLang != "en-US" {
+		t.Errorf("expected lang en-US, got %q", cfg.DefaultLang)
+	}
+}
+
+func TestParseCLIArgsProfileSetMissingKey(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"profile", "set"}, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "profile key required") {
+		t.Fatalf("expected missing key error, got: %v", err)
+	}
+}
+
+func TestParseCLIArgsProfileSetMissingFlags(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"profile", "set", "gcp:default"}, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "at least one flag required") {
+		t.Fatalf("expected at least one flag error, got: %v", err)
+	}
+}
+
+func TestParseCLIArgsProfileSetRejectsExtraArgs(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"profile", "set", "gcp:default", "--voice", "en-US-Chirp3-HD-Kore", "extra"}, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "unexpected arguments") {
+		t.Fatalf("expected unexpected arguments error, got: %v", err)
+	}
+}
