@@ -460,12 +460,107 @@ func TestRunProfileGetInvalidFormat(t *testing.T) {
 func TestRunProfileGetMasksAPIKey(t *testing.T) {
 	reset := stubAppDeps()
 	defer reset()
-
 	var stdout bytes.Buffer
 	if err := runProfileGet(cli.Config{Profile: "gcp:default"}, &stdout); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if strings.Contains(stdout.String(), "test-api-key") {
 		t.Error("expected API key to be masked in output")
+	}
+}
+
+func TestRunProfileSetVoice(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	var saved config.Config
+	saveConfig = func(cfg config.Config) error {
+		saved = cfg
+		return nil
+	}
+
+	var stdout bytes.Buffer
+	cfg := cli.Config{Profile: "gcp:default", DefaultVoice: "en-US-Chirp3-HD-Kore"}
+	if err := runProfileSet(cfg, &stdout); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if saved.Profiles["gcp:default"].Defaults["voice"] != "en-US-Chirp3-HD-Kore" {
+		t.Errorf("expected voice to be updated, got %q", saved.Profiles["gcp:default"].Defaults["voice"])
+	}
+	if !strings.Contains(stdout.String(), "Profile updated: gcp:default") {
+		t.Errorf("expected update message, got: %q", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "en-US-Chirp3-HD-Kore") {
+		t.Errorf("expected voice name in output, got: %q", stdout.String())
+	}
+}
+
+func TestRunProfileSetLang(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	var saved config.Config
+	saveConfig = func(cfg config.Config) error {
+		saved = cfg
+		return nil
+	}
+
+	var stdout bytes.Buffer
+	cfg := cli.Config{Profile: "gcp:default", DefaultLang: "en-GB"}
+	if err := runProfileSet(cfg, &stdout); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if saved.Profiles["gcp:default"].Defaults["lang"] != "en-GB" {
+		t.Errorf("expected lang to be updated, got %q", saved.Profiles["gcp:default"].Defaults["lang"])
+	}
+	// voice should be untouched
+	if saved.Profiles["gcp:default"].Defaults["voice"] != "en-US-Neural2-F" {
+		t.Errorf("expected voice to remain unchanged, got %q", saved.Profiles["gcp:default"].Defaults["voice"])
+	}
+}
+
+func TestRunProfileSetVoiceAndLang(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	var saved config.Config
+	saveConfig = func(cfg config.Config) error {
+		saved = cfg
+		return nil
+	}
+
+	var stdout bytes.Buffer
+	cfg := cli.Config{Profile: "gcp:default", DefaultVoice: "en-US-Chirp3-HD-Kore", DefaultLang: "en-US"}
+	if err := runProfileSet(cfg, &stdout); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if saved.Profiles["gcp:default"].Defaults["voice"] != "en-US-Chirp3-HD-Kore" {
+		t.Errorf("expected voice updated, got %q", saved.Profiles["gcp:default"].Defaults["voice"])
+	}
+	if saved.Profiles["gcp:default"].Defaults["lang"] != "en-US" {
+		t.Errorf("expected lang updated, got %q", saved.Profiles["gcp:default"].Defaults["lang"])
+	}
+}
+
+func TestRunProfileSetNotFound(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	cfg := cli.Config{Profile: "gcp:nonexistent", DefaultVoice: "en-US-Chirp3-HD-Kore"}
+	err := runProfileSet(cfg, &bytes.Buffer{})
+	want := `profile "gcp:nonexistent" not found. Run 'ttscli profile list' to see available profiles`
+	if err == nil || err.Error() != want {
+		t.Fatalf("expected %q, got: %v", want, err)
+	}
+}
+
+func TestRunProfileSetInvalidFormat(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	cfg := cli.Config{Profile: "invalid", DefaultVoice: "en-US-Chirp3-HD-Kore"}
+	err := runProfileSet(cfg, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "invalid profile key") {
+		t.Fatalf("expected invalid profile key error, got: %v", err)
 	}
 }

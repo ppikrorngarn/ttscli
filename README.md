@@ -246,6 +246,7 @@ Prefer managing profiles via the `ttscli profile` subcommands (see [Command Refe
 - `ttscli profile delete <provider:name>`: Delete a profile.
 - `ttscli profile use <provider:name>`: Set the active profile.
 - `ttscli profile get <provider:name>`: Show profile details.
+- `ttscli profile set <provider:name>`: Update default voice and/or language for an existing profile.
 - `ttscli --version`: Print build metadata.
 - `ttscli --help`: Show top-level help.
 
@@ -283,6 +284,15 @@ Prefer managing profiles via the `ttscli profile` subcommands (see [Command Refe
 | `--name` | string | `""` | Required. Unique profile name (e.g., `default`, `work`). Alias: `-n`. |
 | `--api-key` | string | `""` | Required. API key for the provider. Alias: `-k`. |
 | `--voice` | string | `""` | Optional default voice to seed into the profile. Alias: `-v`. |
+
+### `profile set` Flags
+
+| Flag | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `--voice` | string | `""` | New default voice for the profile. Alias: `-v`. |
+| `--lang` | string | `""` | New default language for the profile. Alias: `-l`. |
+
+At least one of `--voice` or `--lang` must be provided.
 
 ### Basic Commands
 
