@@ -321,6 +321,7 @@ func runProfileGet(cfg cli.Config, stdout io.Writer) error {
 	fmt.Fprintln(stdout)
 	fmt.Fprintln(stdout, "Usage:")
 	fmt.Fprintf(stdout, "  ttscli speak --text \"Hello\" --profile %s\n", profileKey)
+	fmt.Fprintf(stdout, "  ttscli say --text \"Hello\" --profile %s\n", profileKey)
 	fmt.Fprintf(stdout, "  ttscli save --text \"Hello\" --out speech.mp3 --profile %s\n", profileKey)
 	return nil
 }
