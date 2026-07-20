@@ -32,12 +32,12 @@ _ttscli_completion() {
   cur="${COMP_WORDS[COMP_CWORD]}"
 
   if [[ ${cword} -eq 1 ]]; then
-    COMPREPLY=( $(compgen -W "speak save voices setup doctor completion profile --version --help" -- "${cur}") )
+    COMPREPLY=( $(compgen -W "speak say save voices setup doctor completion profile --version --help" -- "${cur}") )
     return
   fi
 
   case "${words[1]}" in
-    speak)
+    speak|say)
       COMPREPLY=( $(compgen -W "--text -t --lang -l --voice -v --profile -p --help" -- "${cur}") )
       ;;
     save)
@@ -117,6 +117,7 @@ _ttscli() {
   if (( CURRENT == 2 )); then
     _describe 'command' \
       'speak:Synthesize speech' \
+      'say:Synthesize speech (alias for speak)' \
       'save:Synthesize and save MP3' \
       'voices:List available voices' \
       'setup:Run first-time setup' \
@@ -129,7 +130,7 @@ _ttscli() {
   fi
 
   case "$words[2]" in
-    speak)
+    speak|say)
       _arguments -s $speak_flags
       ;;
     save)
@@ -162,6 +163,7 @@ _ttscli "$@"
 func fishCompletionScript() string {
 	return `# fish completion for ttscli
 complete -c ttscli -f -n "__fish_use_subcommand" -a speak -d "Synthesize speech"
+complete -c ttscli -f -n "__fish_use_subcommand" -a say -d "Synthesize speech (alias for speak)"
 complete -c ttscli -f -n "__fish_use_subcommand" -a save -d "Synthesize and save MP3"
 complete -c ttscli -f -n "__fish_use_subcommand" -a voices -d "List available voices"
 complete -c ttscli -f -n "__fish_use_subcommand" -a setup -d "Run first-time setup"
@@ -185,10 +187,10 @@ complete -c ttscli -f -n "__fish_seen_subcommand_from create" -l name -s n -d "P
 complete -c ttscli -f -n "__fish_seen_subcommand_from create" -l api-key -s k -d "API key"
 complete -c ttscli -f -n "__fish_seen_subcommand_from create" -l voice -s v -d "Default voice"
 
-complete -c ttscli -f -n "__fish_seen_subcommand_from speak" -l text -s t -d "Text to convert to speech"
-complete -c ttscli -f -n "__fish_seen_subcommand_from speak" -l lang -s l -d "Language code"
-complete -c ttscli -f -n "__fish_seen_subcommand_from speak" -l voice -s v -d "Voice name"
-complete -c ttscli -f -n "__fish_seen_subcommand_from speak" -l profile -s p -d "Profile to use"
+complete -c ttscli -f -n "__fish_seen_subcommand_from speak say" -l text -s t -d "Text to convert to speech"
+complete -c ttscli -f -n "__fish_seen_subcommand_from speak say" -l lang -s l -d "Language code"
+complete -c ttscli -f -n "__fish_seen_subcommand_from speak say" -l voice -s v -d "Voice name"
+complete -c ttscli -f -n "__fish_seen_subcommand_from speak say" -l profile -s p -d "Profile to use"
 complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l text -s t -d "Text to convert to speech"
 complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l out -s o -d "Path to save MP3 output"
 complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l lang -s l -d "Language code"
@@ -196,6 +198,6 @@ complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l voice -s v -d "Vo
 complete -c ttscli -f -n "__fish_seen_subcommand_from save" -l profile -s p -d "Profile to use"
 complete -c ttscli -f -n "__fish_seen_subcommand_from voices" -l lang -s l -d "Language code"
 complete -c ttscli -f -n "__fish_seen_subcommand_from voices" -l profile -s p -d "Profile to use"
-complete -c ttscli -f -n "__fish_seen_subcommand_from speak save voices" -l help -d "Show help"
+complete -c ttscli -f -n "__fish_seen_subcommand_from speak say save voices" -l help -d "Show help"
 `
 }
