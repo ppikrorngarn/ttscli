@@ -120,6 +120,34 @@ func TestParseCLIArgsSpeakShorthandFlags(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsSayIsAliasForSpeak(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"say", "--text", "hello"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Mode != ModeSpeak {
+		t.Fatalf("expected mode %q, got %+v", ModeSpeak, cfg)
+	}
+	if cfg.Text != "hello" {
+		t.Fatalf("expected text hello, got %q", cfg.Text)
+	}
+	if !cfg.Play {
+		t.Fatalf("expected Play=true for say, got %+v", cfg)
+	}
+}
+
+func TestParseCLIArgsSayShorthandFlags(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"say", "-t", "hello", "-v", "en-US-Chirp3-HD-Achernar", "-l", "en-US"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Voice != "en-US-Chirp3-HD-Achernar" || cfg.Lang != "en-US" {
+		t.Fatalf("unexpected voice/lang values: %+v", cfg)
+	}
+}
+
 func TestParseCLIArgsSaveMissingText(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := ParseArgs([]string{"save", "--out", "out.mp3"}, &stderr)
