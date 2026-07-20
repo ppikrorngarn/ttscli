@@ -19,7 +19,7 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
 2. **Cloud Provider API Key:** You need an API key for your chosen TTS provider.
    - **Google Cloud:** Go to Google Cloud Console > APIs & Services > Credentials. Create an API Key and restrict it to the "Cloud Text-to-Speech API".
    - **Other providers:** Support coming soon.
-3. **Audio Player (Linux and Windows):** The `speak` command plays MP3 audio and needs an external player. macOS ships with `afplay` by default, so no install is needed there.
+3. **Audio Player (Linux and Windows):** The `speak` command (alias: `say`) plays MP3 audio and needs an external player. macOS ships with `afplay` by default, so no install is needed there.
    - **Linux:** install one of `mpg123`, `paplay`, or `ffplay`.
      - Ubuntu/Debian: `sudo apt install mpg123`
    - **Windows:** install one of `mpg123` or `ffplay` (ships with [ffmpeg](https://ffmpeg.org/)) and make sure the binary is on your `Path`.
@@ -235,7 +235,7 @@ Prefer managing profiles via the `ttscli profile` subcommands (see [Command Refe
 
 ### Command Reference
 
-- `ttscli speak`: Synthesize text to speech and play it immediately.
+- `ttscli speak` (alias: `ttscli say`): Synthesize text to speech and play it immediately.
 - `ttscli save`: Synthesize text to speech and save MP3 output.
 - `ttscli voices`: List available voices (optionally filter with `--lang`).
 - `ttscli setup`: Interactive first-run setup (creates a GCP profile).
@@ -250,7 +250,7 @@ Prefer managing profiles via the `ttscli profile` subcommands (see [Command Refe
 - `ttscli --version`: Print build metadata.
 - `ttscli --help`: Show top-level help.
 
-### `speak` Flags
+### `speak` Flags (also applies to the `say` alias)
 
 | Flag | Type | Default | Notes |
 | --- | --- | --- | --- |
@@ -344,6 +344,9 @@ ttscli speak --text "Hello world, this is a test."
 
 # Using specific profile
 ttscli speak --text "Hello world, this is a test." --profile gcp:work
+
+# "say" is an alias for "speak"
+ttscli say --text "Hello world, this is a test."
 ```
 
 **6. Save audio to a file:**
@@ -368,6 +371,7 @@ ttscli voices --lang en-GB --profile gcp:work
 
 ```bash
 ttscli speak -t "Hello world, this is a test."
+ttscli say -t "Hello world, this is a test."
 ttscli save -t "Save this to a file." -o output.mp3
 ttscli voices -l en-GB
 ```
