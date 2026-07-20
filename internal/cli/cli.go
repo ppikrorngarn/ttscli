@@ -14,6 +14,7 @@ const (
 	helpTitle             = "ttscli - Multi-Provider Text-to-Speech CLI"
 	helpDescription       = "Convert text to speech using cloud TTS providers (Google Cloud, AWS, Azure, and more)."
 	helpUsageSpeak        = `  ttscli speak --text "Hello world"`
+	helpUsageSayAlias     = `  ttscli say --text "Hello world"`
 	helpUsageSave         = `  ttscli save --text "Hello world" --out output.mp3`
 	helpUsageVoices       = "  ttscli voices --lang en-GB"
 	helpExampleSpeak      = `  ttscli speak --text "Hello world, this is a test."`
@@ -25,6 +26,7 @@ const (
 	helpExampleSpeakAlias = `  ttscli speak -t "Quick test" -l en-GB -v en-GB-Neural2-B`
 	helpExampleSaveAlias  = `  ttscli save -t "Save this" -o speech.mp3`
 	ModeSpeak             = "speak"
+	ModeSayAlias          = "say"
 	ModeSave              = "save"
 	ModeVoices            = "voices"
 	ModeSetup             = "setup"
@@ -75,7 +77,7 @@ func ParseArgs(args []string, stderr io.Writer) (Config, error) {
 		return Config{}, flag.ErrHelp
 	}
 
-	if len(args) > 0 && args[0] == ModeSpeak {
+	if len(args) > 0 && (args[0] == ModeSpeak || args[0] == ModeSayAlias) {
 		return parseSpeakCommand(args[1:], stderr)
 	}
 	if len(args) > 0 && args[0] == ModeSave {
@@ -239,7 +241,7 @@ func printHelp(stderr io.Writer) {
 	fmt.Fprintln(stderr, helpDescription)
 	fmt.Fprintln(stderr)
 	fmt.Fprintln(stderr, "Commands:")
-	fmt.Fprintln(stderr, "  speak       Synthesize text and play audio immediately")
+	fmt.Fprintln(stderr, "  speak       Synthesize text and play audio immediately (alias: say)")
 	fmt.Fprintln(stderr, "  save        Synthesize text and save to MP3 file")
 	fmt.Fprintln(stderr, "  voices      List available voices for a language")
 	fmt.Fprintln(stderr, "  setup       Run interactive first-time setup")
@@ -252,6 +254,7 @@ func printHelp(stderr io.Writer) {
 	fmt.Fprintln(stderr)
 	fmt.Fprintln(stderr, "Examples:")
 	fmt.Fprintln(stderr, helpUsageSpeak)
+	fmt.Fprintln(stderr, helpUsageSayAlias)
 	fmt.Fprintln(stderr, helpUsageSave)
 	fmt.Fprintln(stderr, helpUsageVoices)
 	fmt.Fprintln(stderr)
