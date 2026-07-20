@@ -267,5 +267,6 @@ func PrintVoices(w io.Writer, langCode string, voices []Voice) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintf(w, "  ttscli speak --text \"Hello\" --lang %s --voice <VOICE_NAME>\n", langCode)
+	fmt.Fprintf(w, "  ttscli say --text \"Hello\" --lang %s --voice <VOICE_NAME>\n", langCode)
 	fmt.Fprintf(w, "  ttscli save --text \"Hello\" --out speech.mp3 --lang %s --voice <VOICE_NAME>\n", langCode)
 }
