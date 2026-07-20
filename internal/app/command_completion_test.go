@@ -23,7 +23,7 @@ func TestRunCompletionBash(t *testing.T) {
 	}
 	out := stdout.String()
 	if !strings.Contains(out, "complete -F _ttscli_completion ttscli") ||
-		!strings.Contains(out, "speak save voices setup doctor completion profile") ||
+		!strings.Contains(out, "speak say save voices setup doctor completion profile") ||
 		!strings.Contains(out, "--text -t --lang -l --voice -v --profile -p --help") ||
 		!strings.Contains(out, "list create delete use get") ||
 		!strings.Contains(out, "--provider -P --name -n --api-key -k --voice -v") {
@@ -45,6 +45,7 @@ func TestRunCompletionZsh(t *testing.T) {
 	}
 	out := stdout.String()
 	if !strings.Contains(out, "#compdef ttscli") ||
+		!strings.Contains(out, "say:Synthesize speech (alias for speak)") ||
 		!strings.Contains(out, "completion:Generate shell completions") ||
 		!strings.Contains(out, "profile:Manage TTS provider profiles") ||
 		!strings.Contains(out, "'-t[Text to convert to speech]:text:'") ||
@@ -68,6 +69,7 @@ func TestRunCompletionFish(t *testing.T) {
 	}
 	out := stdout.String()
 	if !strings.Contains(out, "complete -c ttscli") ||
+		!strings.Contains(out, "-a say -d \"Synthesize speech (alias for speak)\"") ||
 		!strings.Contains(out, "-a completion") ||
 		!strings.Contains(out, "-a profile") ||
 		!strings.Contains(out, "-l text -s t") ||
