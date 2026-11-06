@@ -81,7 +81,7 @@ func TestPlannedIsCopy(t *testing.T) {
 }
 
 func TestNamesListsEveryImplementedProvider(t *testing.T) {
-	want := []string{"alibaba", "azure", "gcp", "ibm"}
+	want := []string{"alibaba", "aws", "azure", "gcp", "ibm"}
 	got := Names()
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("Names() = %v, want %v", got, want)

@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/github/license/ppikrorngarn/ttscli)](LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/ppikrorngarn/ttscli)](https://github.com/ppikrorngarn/ttscli/releases/latest)
 
-A lightweight, fast Command Line Interface (CLI) written in Go to convert text into speech using multiple cloud TTS providers. Supports Google Cloud, Azure Speech, IBM Watson and Alibaba Cloud; Amazon Polly is in progress.
+A lightweight, fast Command Line Interface (CLI) written in Go to convert text into speech using multiple cloud TTS providers. Supports Google Cloud, Amazon Polly, Azure Speech, IBM Watson and Alibaba Cloud.
 
 This tool allows you to easily synthesize speech, save it to an MP3 file, or play it directly from your terminal on macOS, Linux, and Windows.
 
@@ -18,6 +18,7 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
 1. **Go:** Install Go `1.25+` (matches `go.mod`).
 2. **Cloud Provider Credentials:** You need credentials for your chosen TTS provider.
    - **Google Cloud:** Google Cloud Console > APIs & Services > Credentials. Create an API Key and restrict it to the "Cloud Text-to-Speech API".
+   - **Amazon Polly:** an IAM access key ID and secret with `polly:SynthesizeSpeech` and `polly:DescribeVoices`, plus the region (e.g. `us-east-1`).
    - **Azure Speech:** Azure portal > your Speech resource > Keys and Endpoint: a key and the region (e.g. `eastus`).
    - **IBM Watson:** IBM Cloud > Resource list > your Text to Speech instance > Service credentials: the API key and the service URL.
    - **Alibaba Cloud:** RAM AccessKey ID and secret, the Intelligent Speech Interaction project Appkey, and the region (`cn-shanghai` or `ap-southeast-1`).
@@ -205,7 +206,7 @@ On Windows, the equivalent is typically `ttscli.exe` from a directory such as `%
 - ✅ **Azure Speech (`azure`)**: Implemented; tested against the documented REST API, not yet against a live resource
 - ✅ **IBM Watson (`ibm`)**: Implemented; tested against the documented REST API, not yet against a live instance
 - ✅ **Alibaba Cloud (`alibaba`)**: Implemented; tested against the documented REST API, not yet against a live account
-- 🚧 **Amazon Polly (`aws`)**: In progress
+- ✅ **Amazon Polly (`aws`)**: Implemented; tested against the documented REST API and the official SigV4 test vectors, not yet against a live account
 
 If you run one of the not-yet-live-verified providers and hit a problem, please open an issue with the `ttscli doctor` output.
 
@@ -307,6 +308,7 @@ Every credential the chosen provider declares must be supplied. Passing the same
 | Provider | `--provider` | Credentials (`--credential key=value`) | Default language / voice |
 | :--- | :--- | :--- | :--- |
 | Google Cloud | `gcp` | `apiKey` (or `--api-key`) | `en-US` / `en-US-Neural2-F` |
+| Amazon Polly | `aws` | `accessKeyId`, `secretAccessKey`, `region` (e.g. `us-east-1`) | `en-US` / `Joanna` |
 | Azure Speech | `azure` | `subscriptionKey`, `region` (e.g. `eastus`) | `en-US` / `en-US-JennyNeural` |
 | IBM Watson | `ibm` | `apiKey` (or `--api-key`), `url` (service URL) | `en-US` / `en-US_MichaelV3Voice` |
 | Alibaba Cloud | `alibaba` | `accessKeyId`, `accessKeySecret`, `appKey`, `region` (`cn-shanghai` or `ap-southeast-1`) | `zh-CN` / `xiaoyun` |
@@ -314,13 +316,15 @@ Every credential the chosen provider declares must be supplied. Passing the same
 Examples:
 
 ```bash
+ttscli profile create --provider aws --name work -c accessKeyId=AKIA... -c secretAccessKey=SECRET -c region=us-east-1
 ttscli profile create --provider azure --name work -c subscriptionKey=KEY -c region=eastus
 ttscli profile create --provider ibm --name work --api-key KEY -c url=https://api.us-south.text-to-speech.watson.cloud.ibm.com/instances/ID
 ttscli profile create --provider alibaba --name work -c accessKeyId=ID -c accessKeySecret=SECRET -c appKey=APPKEY -c region=cn-shanghai
 ```
 
 Provider notes:
-- **Azure** and **Alibaba** need a voice name for every language; `ttscli voices --lang <code>` lists them. Alibaba accepts at most 300 characters per request and ships a static voice list (no list API on the Alibaba side).
+- **Amazon Polly**, **Azure** and **Alibaba** need a voice name for every language; `ttscli voices --lang <code>` lists them. Alibaba accepts at most 300 characters per request and ships a static voice list (no list API on the Alibaba side).
+- **Amazon Polly** tries the `neural` engine first and falls back to `standard`; generative-only voices are not reachable yet. Only long-term access keys are supported, not STS session tokens.
 - **IBM** voices are language-specific. Without `--voice`, ttscli picks the first voice IBM lists for the requested language.
 
 ### `profile set` Flags
@@ -460,7 +464,7 @@ internal/player/     Cross-platform audio playback. macOS: afplay. Linux: mpg123
                      Windows: mpg123 or ffplay (requires install).
 internal/tts/        Provider interface and shared types (provider.go), the provider registry
                      with per-provider credential specs (registry.go), and one file per
-                     provider implementation (gcp.go, azure.go, ibm.go, alibaba.go).
+                     provider implementation (gcp.go, aws.go, azure.go, ibm.go, alibaba.go).
 ```
 
 Packages under `internal/` use small, package-level function variables (e.g. `readFile`, `writeFile`, `lookupEnv`) for dependency injection, so tests can stub the filesystem, environment, and HTTP calls without real I/O.

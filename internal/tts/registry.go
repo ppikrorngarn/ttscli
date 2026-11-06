@@ -58,14 +58,16 @@ var gcpSpec = Spec{
 // registry holds every implemented provider keyed by Spec.Name.
 var registry = map[string]Spec{
 	alibabaSpec.Name: alibabaSpec,
+	awsSpec.Name:     awsSpec,
 	azureSpec.Name:   azureSpec,
 	gcpSpec.Name:     gcpSpec,
 	ibmSpec.Name:     ibmSpec,
 }
 
 // plannedProviders are advertised but not implemented yet. They get a
-// friendlier error than an unknown name.
-var plannedProviders = []string{"aws"}
+// friendlier error than an unknown name. Empty today: every announced
+// provider is implemented.
+var plannedProviders []string
 
 // Lookup returns the Spec registered under name.
 func Lookup(name string) (Spec, bool) {
