@@ -11,7 +11,6 @@ import (
 const (
 	appName               = "ttscli"
 	DefaultLanguage       = "en-US"
-	DefaultVoice          = "en-US-Neural2-F"
 	helpTitle             = "ttscli - Multi-Provider Text-to-Speech CLI"
 	helpDescription       = "Convert text to speech using cloud TTS providers (Google Cloud, AWS, Azure, and more)."
 	helpUsageSpeak        = `  ttscli speak --text "Hello world"`
@@ -173,8 +172,8 @@ func addLangFlag(fs *flag.FlagSet, target *string, usage string) {
 }
 
 func addVoiceFlag(fs *flag.FlagSet, target *string, usage string) {
-	fs.StringVar(target, "voice", DefaultVoice, usage)
-	fs.StringVar(target, "v", DefaultVoice, "Voice name (shorthand)")
+	fs.StringVar(target, "voice", "", usage)
+	fs.StringVar(target, "v", "", "Voice name (shorthand)")
 }
 
 func addProfileFlag(fs *flag.FlagSet, target *string) {
@@ -209,7 +208,7 @@ func parseSpeakCommand(args []string, stderr io.Writer) (Config, error) {
 	fs.StringVar(&cfg.Text, "text", "", "Text to convert to speech")
 	fs.StringVar(&cfg.Text, "t", "", "Text to convert to speech (shorthand)")
 	addLangFlag(fs, &cfg.Lang, "Language code (e.g., en-US, en-GB, fr-FR)")
-	addVoiceFlag(fs, &cfg.Voice, "Voice name for synthesis")
+	addVoiceFlag(fs, &cfg.Voice, "Voice name for synthesis (default: profile voice, then the provider default)")
 	addProfileFlag(fs, &cfg.Profile)
 
 	if err := fs.Parse(args); err != nil {
@@ -237,7 +236,7 @@ func parseSaveCommand(args []string, stderr io.Writer) (Config, error) {
 	fs.StringVar(&cfg.SavePath, "out", "", "Path to save the output MP3 file (e.g., output.mp3)")
 	fs.StringVar(&cfg.SavePath, "o", "", "Path to save the output MP3 file (shorthand)")
 	addLangFlag(fs, &cfg.Lang, "Language code (e.g., en-US, en-GB, fr-FR)")
-	addVoiceFlag(fs, &cfg.Voice, "Voice name for synthesis")
+	addVoiceFlag(fs, &cfg.Voice, "Voice name for synthesis (default: profile voice, then the provider default)")
 	addProfileFlag(fs, &cfg.Profile)
 
 	if err := fs.Parse(args); err != nil {
@@ -312,7 +311,7 @@ func printHelp(stderr io.Writer) {
 	fmt.Fprintln(stderr, "  -t, --text      Text to convert to speech (speak/save)")
 	fmt.Fprintln(stderr, "  -o, --out       Output MP3 file path (save)")
 	fmt.Fprintln(stderr, "  -l, --lang      Language code (default: en-US)")
-	fmt.Fprintln(stderr, "  -v, --voice     Voice name (default: en-US-Neural2-F)")
+	fmt.Fprintln(stderr, "  -v, --voice     Voice name (default: profile voice, then the provider default)")
 	fmt.Fprintln(stderr, "  -p, --profile   Profile to use (e.g., gcp:default)")
 	fmt.Fprintln(stderr, "  --version       Print version information")
 	fmt.Fprintln(stderr, "  --help, -h      Show this help message")

@@ -81,7 +81,7 @@ func TestParseCLIArgsValidSpeak(t *testing.T) {
 	if !cfg.Play {
 		t.Fatalf("expected Play=true for speak, got %+v", cfg)
 	}
-	if cfg.Lang != DefaultLanguage || cfg.Voice != DefaultVoice {
+	if cfg.Lang != DefaultLanguage || cfg.Voice != "" {
 		t.Fatalf("unexpected defaults: lang=%q voice=%q", cfg.Lang, cfg.Voice)
 	}
 }

@@ -7,15 +7,21 @@ import (
 
 	"github.com/ppikrorngarn/ttscli/internal/cli"
 	"github.com/ppikrorngarn/ttscli/internal/config"
+	"github.com/ppikrorngarn/ttscli/internal/tts"
 )
 
-// resolveProfileDefaults applies profile defaults to the config when flags are not provided.
-func resolveProfileDefaults(cfg cli.Config, profile config.Profile) cli.Config {
+// resolveProfileDefaults fills in language and voice when flags were not given:
+// profile defaults first, then the provider's own default voice for the
+// resolved language. A nil provider skips that last step.
+func resolveProfileDefaults(cfg cli.Config, profile config.Profile, provider tts.Provider) cli.Config {
 	if !cfg.HasVoiceFlag && profile.Defaults["voice"] != "" {
 		cfg.Voice = profile.Defaults["voice"]
 	}
 	if !cfg.HasLangFlag && profile.Defaults["lang"] != "" {
 		cfg.Lang = profile.Defaults["lang"]
+	}
+	if cfg.Voice == "" && provider != nil {
+		cfg.Voice = provider.DefaultVoice(cfg.Lang)
 	}
 	return cfg
 }

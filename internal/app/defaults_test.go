@@ -108,13 +108,13 @@ func TestResolveProfileDefaults(t *testing.T) {
 	}
 
 	// Neither flag set — profile defaults applied.
-	cfg := resolveProfileDefaults(cli.Config{}, profile)
+	cfg := resolveProfileDefaults(cli.Config{}, profile, nil)
 	if cfg.Voice != "en-US-Neural2-F" || cfg.Lang != "en-US" {
 		t.Errorf("expected profile defaults, got voice=%q lang=%q", cfg.Voice, cfg.Lang)
 	}
 
 	// Voice flag set — voice kept, lang from profile.
-	cfg2 := resolveProfileDefaults(cli.Config{Voice: "custom", HasVoiceFlag: true}, profile)
+	cfg2 := resolveProfileDefaults(cli.Config{Voice: "custom", HasVoiceFlag: true}, profile, nil)
 	if cfg2.Voice != "custom" {
 		t.Errorf("expected custom voice to be kept, got %q", cfg2.Voice)
 	}
@@ -123,7 +123,7 @@ func TestResolveProfileDefaults(t *testing.T) {
 	}
 
 	// Lang flag set — lang kept, voice from profile.
-	cfg3 := resolveProfileDefaults(cli.Config{Lang: "en-GB", HasLangFlag: true}, profile)
+	cfg3 := resolveProfileDefaults(cli.Config{Lang: "en-GB", HasLangFlag: true}, profile, nil)
 	if cfg3.Lang != "en-GB" {
 		t.Errorf("expected en-GB to be kept, got %q", cfg3.Lang)
 	}
@@ -132,7 +132,7 @@ func TestResolveProfileDefaults(t *testing.T) {
 	}
 
 	// Both flags set — both kept.
-	cfg4 := resolveProfileDefaults(cli.Config{Voice: "custom", Lang: "fr-FR", HasVoiceFlag: true, HasLangFlag: true}, profile)
+	cfg4 := resolveProfileDefaults(cli.Config{Voice: "custom", Lang: "fr-FR", HasVoiceFlag: true, HasLangFlag: true}, profile, nil)
 	if cfg4.Voice != "custom" || cfg4.Lang != "fr-FR" {
 		t.Errorf("expected flags to take precedence, got voice=%q lang=%q", cfg4.Voice, cfg4.Lang)
 	}
@@ -140,8 +140,39 @@ func TestResolveProfileDefaults(t *testing.T) {
 
 func TestResolveProfileDefaultsEmptyProfileDefaults(t *testing.T) {
 	profile := config.Profile{Defaults: map[string]string{}}
-	cfg := resolveProfileDefaults(cli.Config{Voice: "v", Lang: "l"}, profile)
+	cfg := resolveProfileDefaults(cli.Config{Voice: "v", Lang: "l"}, profile, nil)
 	if cfg.Voice != "v" || cfg.Lang != "l" {
 		t.Errorf("expected original values kept when profile has no defaults, got voice=%q lang=%q", cfg.Voice, cfg.Lang)
+	}
+}
+
+func TestResolveProfileDefaultsFallsBackToProviderVoice(t *testing.T) {
+	provider := &fakeTTSClient{} // DefaultVoice: en-US -> en-US-Neural2-F, else ""
+	profile := config.Profile{Defaults: map[string]string{"lang": "en-US"}}
+
+	// No voice anywhere: provider default for the resolved language.
+	cfg := resolveProfileDefaults(cli.Config{Lang: "en-US"}, profile, provider)
+	if cfg.Voice != "en-US-Neural2-F" {
+		t.Errorf("expected provider default voice, got %q", cfg.Voice)
+	}
+
+	// Provider has no default for the language: voice stays empty so the
+	// provider API can pick one.
+	cfg2 := resolveProfileDefaults(cli.Config{Lang: "fr-FR", HasLangFlag: true}, profile, provider)
+	if cfg2.Voice != "" {
+		t.Errorf("expected empty voice for fr-FR, got %q", cfg2.Voice)
+	}
+
+	// Profile voice wins over the provider default.
+	withVoice := config.Profile{Defaults: map[string]string{"lang": "en-US", "voice": "en-US-Chirp3-HD-Kore"}}
+	cfg3 := resolveProfileDefaults(cli.Config{Lang: "en-US"}, withVoice, provider)
+	if cfg3.Voice != "en-US-Chirp3-HD-Kore" {
+		t.Errorf("expected profile voice to win, got %q", cfg3.Voice)
+	}
+
+	// Explicit flag wins over everything.
+	cfg4 := resolveProfileDefaults(cli.Config{Lang: "en-US", Voice: "custom", HasVoiceFlag: true}, withVoice, provider)
+	if cfg4.Voice != "custom" {
+		t.Errorf("expected flag voice to win, got %q", cfg4.Voice)
 	}
 }
