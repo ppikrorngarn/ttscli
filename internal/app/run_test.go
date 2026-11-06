@@ -120,6 +120,21 @@ func stubAppDeps() func() {
 			},
 		}, nil
 	}
+	// Pin the registry view to gcp only, so tests of the single-provider flows
+	// (silent provider choice in setup, "Available today: gcp" errors) stay
+	// independent of which real providers are compiled in. "aws" plays the
+	// planned-but-unimplemented role.
+	providerNames = func() []string { return []string{"gcp"} }
+	validateProviderName = func(name string) error {
+		switch name {
+		case "gcp":
+			return nil
+		case "aws":
+			return fmt.Errorf("provider %q is not yet implemented. Available today: gcp", name)
+		default:
+			return fmt.Errorf("unsupported provider %q. Supported providers: gcp", name)
+		}
+	}
 	newProvider = func(profile config.Profile) (tts.Provider, error) {
 		return &fakeTTSClient{
 			listVoicesFn: func(ctx context.Context, langCode string) ([]tts.Voice, error) {

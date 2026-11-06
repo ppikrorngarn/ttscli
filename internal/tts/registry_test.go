@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"reflect"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -49,25 +51,49 @@ func TestNamesSorted(t *testing.T) {
 	defer registerForTest(fakeSpec)()
 	defer registerForTest(Spec{Name: "aaa"})()
 	got := Names()
-	want := []string{"aaa", "fake", "gcp"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("Names() = %v, want %v", got, want)
+	if !sort.StringsAreSorted(got) {
+		t.Fatalf("Names() = %v is not sorted", got)
+	}
+	for _, want := range []string{"aaa", "fake", "gcp"} {
+		if !slices.Contains(got, want) {
+			t.Fatalf("Names() = %v is missing %q", got, want)
+		}
 	}
 }
 
 func TestPlannedIsCopy(t *testing.T) {
+	defer setPlannedForTest([]string{"zeta", "yota"})()
 	first := Planned()
 	first[0] = "mutated"
 	if Planned()[0] == "mutated" {
 		t.Fatal("Planned() must return a copy")
 	}
-	for _, name := range []string{"aws", "azure", "ibm", "alibaba"} {
+	for _, name := range []string{"zeta", "yota"} {
 		if !IsPlanned(name) {
 			t.Errorf("expected %q to be planned", name)
 		}
 	}
-	if IsPlanned("gcp") {
-		t.Error("gcp must not be planned")
+	for _, name := range Names() {
+		if IsPlanned(name) {
+			t.Errorf("implemented provider %q must not be planned", name)
+		}
+	}
+}
+
+func TestNamesListsEveryImplementedProvider(t *testing.T) {
+	want := []string{"alibaba", "azure", "gcp", "ibm"}
+	got := Names()
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("Names() = %v, want %v", got, want)
+	}
+	for _, name := range want {
+		spec, ok := Lookup(name)
+		if !ok {
+			t.Fatalf("Lookup(%q) failed", name)
+		}
+		if spec.Name != name || spec.DisplayName == "" || spec.DefaultLang == "" || spec.DefaultVoice == "" || spec.New == nil || len(spec.Credentials) == 0 {
+			t.Errorf("spec %q is incomplete: %+v", name, spec)
+		}
 	}
 }
 
@@ -75,12 +101,14 @@ func TestValidateName(t *testing.T) {
 	if err := ValidateName("gcp"); err != nil {
 		t.Fatalf("gcp should validate, got %v", err)
 	}
-	err := ValidateName("azure")
-	if err == nil || !strings.Contains(err.Error(), "not yet implemented") || !strings.Contains(err.Error(), "Available today: gcp") {
+	defer setPlannedForTest([]string{"zeta"})()
+	available := strings.Join(Names(), ", ")
+	err := ValidateName("zeta")
+	if err == nil || !strings.Contains(err.Error(), "not yet implemented") || !strings.Contains(err.Error(), "Available today: "+available) {
 		t.Fatalf("unexpected planned error: %v", err)
 	}
 	err = ValidateName("openai")
-	if err == nil || !strings.Contains(err.Error(), "unsupported provider") || !strings.Contains(err.Error(), "Supported providers: gcp") {
+	if err == nil || !strings.Contains(err.Error(), "unsupported provider") || !strings.Contains(err.Error(), "Supported providers: "+available) {
 		t.Fatalf("unexpected unknown error: %v", err)
 	}
 }
@@ -124,7 +152,8 @@ func TestNewProviderNonStringCredential(t *testing.T) {
 }
 
 func TestNewProviderPlannedAndUnknown(t *testing.T) {
-	for _, name := range []string{"aws", "azure", "ibm", "alibaba"} {
+	defer setPlannedForTest([]string{"zeta", "yota"})()
+	for _, name := range []string{"zeta", "yota"} {
 		_, err := NewProvider(name, nil)
 		if err == nil || !strings.Contains(err.Error(), "not yet implemented") {
 			t.Errorf("provider %q: expected not implemented error, got: %v", name, err)
