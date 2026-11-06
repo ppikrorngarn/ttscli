@@ -121,8 +121,8 @@ func (c *IBMClient) Name() string {
 }
 
 // DefaultVoice returns the service's own default voice for US English. For
-// every other language it returns "", so the voice query parameter is omitted
-// and the service picks its default (also en-US_MichaelV3Voice).
+// every other language it returns "", and SynthesizeRequest then picks a voice
+// for the requested language itself (see resolveVoice).
 func (c *IBMClient) DefaultVoice(langCode string) string {
 	if strings.EqualFold(langCode, ibmSpec.DefaultLang) {
 		return ibmSpec.DefaultVoice
@@ -131,17 +131,24 @@ func (c *IBMClient) DefaultVoice(langCode string) string {
 }
 
 // SynthesizeRequest performs POST {url}/v1/synthesize and returns raw MP3 bytes.
-// req.LanguageCode is not sent: IBM voices are language-specific, so the voice
-// name alone selects the language.
+// req.LanguageCode is not sent: the service has no language parameter and IBM
+// voices are language-specific, so the voice name alone selects the language.
+// When no voice is given for a language other than en-US, a voice for that
+// language is looked up first, because the service would otherwise fall back
+// to its en-US default and read the text in the wrong language.
 func (c *IBMClient) SynthesizeRequest(ctx context.Context, req SynthRequest) ([]byte, error) {
 	payload, err := json.Marshal(ibmSynthesizeRequest{Text: req.Text})
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
+	voice, err := c.resolveVoice(ctx, req)
+	if err != nil {
+		return nil, err
+	}
 	params := url.Values{}
-	if req.VoiceName != "" {
-		params.Set("voice", req.VoiceName)
+	if voice != "" {
+		params.Set("voice", voice)
 	}
 	reqURL, err := c.buildRequestURL(ibmPathSynthesize, params)
 	if err != nil {
@@ -166,6 +173,28 @@ func (c *IBMClient) SynthesizeRequest(ctx context.Context, req SynthRequest) ([]
 		return nil, fmt.Errorf("unexpected non-audio response (Content-Type %q): %s", contentType, ibmBodySnippet(body))
 	}
 	return body, nil
+}
+
+// resolveVoice returns the voice name to send. An explicit VoiceName wins. With
+// no voice and no language, or en-US, "" is returned so the voice query is
+// omitted and the service default (en-US_MichaelV3Voice) applies. For any other
+// language the first voice (sorted by name) the service lists for it is used.
+func (c *IBMClient) resolveVoice(ctx context.Context, req SynthRequest) (string, error) {
+	if req.VoiceName != "" {
+		return req.VoiceName, nil
+	}
+	lang := strings.TrimSpace(req.LanguageCode)
+	if lang == "" || strings.EqualFold(lang, ibmSpec.DefaultLang) {
+		return "", nil
+	}
+	voices, err := c.ListVoices(ctx, lang)
+	if err != nil {
+		return "", fmt.Errorf("look up a voice for language %q: %w", lang, err)
+	}
+	if len(voices) == 0 {
+		return "", fmt.Errorf("ibm: no voice available for language %q; pass a voice name or list voices for a supported language", lang)
+	}
+	return voices[0].Name, nil
 }
 
 // ListVoices performs GET {url}/v1/voices. The service has no server-side
@@ -241,9 +270,28 @@ func (c *IBMClient) do(req *http.Request) ([]byte, string, error) {
 		return nil, "", fmt.Errorf("read response: %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, "", formatAPIError(resp.StatusCode, body)
+		return nil, "", formatIBMAPIError(resp.StatusCode, body)
 	}
 	return body, resp.Header.Get("Content-Type"), nil
+}
+
+// formatIBMAPIError formats an IBM error body {"code":N,"error":"...",
+// "code_description":"..."}. The shared formatAPIError already reads the
+// string "error" field; when that is empty, code_description (the HTTP reason
+// phrase, for example "Not Found") is used so the message is never bare.
+func formatIBMAPIError(statusCode int, body []byte) error {
+	if extractAPIErrorMessage(body) != "" {
+		return formatAPIError(statusCode, body)
+	}
+	var parsed struct {
+		CodeDescription string `json:"code_description"`
+	}
+	if err := json.Unmarshal(body, &parsed); err == nil {
+		if desc := strings.TrimSpace(parsed.CodeDescription); desc != "" {
+			return fmt.Errorf("tts request failed with status %d: %s", statusCode, desc)
+		}
+	}
+	return formatAPIError(statusCode, body)
 }
 
 func validateIBMServiceURL(raw string) error {
@@ -252,7 +300,7 @@ func validateIBMServiceURL(raw string) error {
 		return fmt.Errorf("ibm: invalid service url %q: %w", raw, err)
 	}
 	if (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" {
-		return fmt.Errorf("ibm: service url %q must start with https:// and include a host", raw)
+		return fmt.Errorf("ibm: service url %q must start with https:// (or http://) and include a host", raw)
 	}
 	return nil
 }
