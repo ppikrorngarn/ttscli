@@ -28,7 +28,7 @@ var (
 	loadConfig             = config.LoadConfig
 	saveConfig             = config.SaveConfig
 	getProfile             = config.GetProfile
-	printVoices            = tts.PrintVoices
+	printVoices            = printVoicesImpl
 	writeFile              = os.WriteFile
 	playAudio              = player.PlayAudio
 	setupInput   io.Reader = os.Stdin

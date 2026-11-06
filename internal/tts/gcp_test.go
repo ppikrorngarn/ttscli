@@ -1,7 +1,6 @@
 package tts
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -372,22 +371,6 @@ func TestTTSClientSynthesizeErrorStatusDoesNotLeakResponseBody(t *testing.T) {
 	}
 	if err.Error() != "tts request failed with status 403" {
 		t.Fatalf("expected status-only fallback, got: %v", err)
-	}
-}
-
-func TestPrintVoices(t *testing.T) {
-	voices := []Voice{
-		{Name: "en-US-Neural2-F", SsmlGender: "FEMALE", LanguageCodes: []string{"en-US"}},
-		{Name: "en-GB-Neural2-B", SsmlGender: "MALE", LanguageCodes: []string{"en-GB"}},
-	}
-	var buf bytes.Buffer
-	PrintVoices(&buf, "en-US", voices)
-	out := buf.String()
-	if !strings.Contains(out, "en-US-Neural2-F") || !strings.Contains(out, "FEMALE") {
-		t.Errorf("expected voice details in output, got: %q", out)
-	}
-	if !strings.Contains(out, "en-US") {
-		t.Errorf("expected language code in header, got: %q", out)
 	}
 }
 

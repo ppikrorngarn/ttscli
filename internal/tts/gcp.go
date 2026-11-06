@@ -237,27 +237,3 @@ func stringValue(raw json.RawMessage) string {
 	}
 	return strings.TrimSpace(value)
 }
-
-func PrintVoices(w io.Writer, langCode string, voices []Voice) {
-	fmt.Fprintf(w, "Available voices for language: %s\n", langCode)
-	fmt.Fprintf(w, "Found %d voice(s)\n", len(voices))
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "VOICE NAME                            GENDER       LANGUAGES")
-	fmt.Fprintln(w, "───────────────────────────────────── ──────────── ─────────────────────")
-	for _, v := range voices {
-		gender := v.SsmlGender
-		if gender == "" {
-			gender = "Unknown"
-		}
-		languages := strings.Join(v.LanguageCodes, ", ")
-		if len(languages) > 35 {
-			languages = languages[:32] + "..."
-		}
-		fmt.Fprintf(w, "%-37s %-12s %s\n", v.Name, gender, languages)
-	}
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintf(w, "  ttscli speak --text \"Hello\" --lang %s --voice <VOICE_NAME>\n", langCode)
-	fmt.Fprintf(w, "  ttscli say --text \"Hello\" --lang %s --voice <VOICE_NAME>\n", langCode)
-	fmt.Fprintf(w, "  ttscli save --text \"Hello\" --out speech.mp3 --lang %s --voice <VOICE_NAME>\n", langCode)
-}

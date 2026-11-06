@@ -137,3 +137,19 @@ func TestPromptPasswordTrimsWhitespace(t *testing.T) {
 		t.Errorf("expected trimmed value, got %q", got)
 	}
 }
+
+func TestPrintVoicesImpl(t *testing.T) {
+	voices := []tts.Voice{
+		{Name: "en-US-Neural2-F", SsmlGender: "FEMALE", LanguageCodes: []string{"en-US"}},
+		{Name: "en-GB-Neural2-B", SsmlGender: "MALE", LanguageCodes: []string{"en-GB"}},
+	}
+	var buf bytes.Buffer
+	printVoicesImpl(&buf, "en-US", voices)
+	out := buf.String()
+	if !strings.Contains(out, "en-US-Neural2-F") || !strings.Contains(out, "FEMALE") {
+		t.Errorf("expected voice details in output, got: %q", out)
+	}
+	if !strings.Contains(out, "en-US") {
+		t.Errorf("expected language code in header, got: %q", out)
+	}
+}
