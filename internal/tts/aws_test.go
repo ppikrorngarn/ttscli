@@ -125,8 +125,9 @@ func TestAWSSynthesizeRequestShape(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestAWSClient(t, srv)
+	// "en-gb" must reach Polly as "en-GB": LanguageCode is a case-sensitive enum.
 	_, err := c.SynthesizeRequest(context.Background(), SynthRequest{
-		Text: "hello world", LanguageCode: "en-GB", VoiceName: "Amy", AudioEncoding: AudioEncodingMP3,
+		Text: "hello world", LanguageCode: "en-gb", VoiceName: "Amy", AudioEncoding: AudioEncodingMP3,
 	})
 	if err != nil {
 		t.Fatalf("SynthesizeRequest returned error: %v", err)
@@ -154,7 +155,9 @@ func TestAWSSynthesizeRequestShape(t *testing.T) {
 	}
 
 	auth := gotHeaders.Get("Authorization")
-	prefix := "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20150830/us-east-1/polly/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature="
+	// Content-Type is present on the POST, so the reference requires it in the
+	// canonical headers alongside host and the x-amz-* headers.
+	prefix := "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20150830/us-east-1/polly/aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date, Signature="
 	if !strings.HasPrefix(auth, prefix) {
 		t.Fatalf("unexpected Authorization header: %q", auth)
 	}
@@ -167,6 +170,7 @@ func TestAWSSynthesizeRequestShape(t *testing.T) {
 	// shared secret; it must match what the client sent.
 	payloadHash := hexSHA256(gotRaw)
 	canonical, _ := sigV4CanonicalRequest(http.MethodPost, awsPathSynthesize, url.Values{}, map[string]string{
+		"content-type":         gotHeaders.Get("Content-Type"),
 		"host":                 gotHost,
 		"x-amz-content-sha256": payloadHash,
 		"x-amz-date":           "20150830T123600Z",
@@ -191,6 +195,61 @@ func TestAWSSynthesizeErrorStatusIncludesMessageAndType(t *testing.T) {
 	want := "tts request failed with status 403: The security token included in the request is invalid. (UnrecognizedClientException)"
 	if err == nil || err.Error() != want {
 		t.Fatalf("expected %q, got: %v", want, err)
+	}
+}
+
+// Without the x-amzn-ErrorType header the REST-JSON body still names the
+// error class in "__type", namespaced; the SDKs strip the namespace.
+func TestAWSSynthesizeErrorTypeFallsBackToBodyType(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, `{"__type":"com.amazonaws.polly#InvalidSsmlException","message":"The SSML you provided is invalid."}`)
+	}))
+	defer srv.Close()
+
+	c := newTestAWSClient(t, srv)
+	_, err := c.SynthesizeRequest(context.Background(), SynthRequest{
+		Text: "hello", LanguageCode: "en-US", VoiceName: "Joanna", AudioEncoding: AudioEncodingMP3,
+	})
+	want := "tts request failed with status 400: The SSML you provided is invalid. (InvalidSsmlException)"
+	if err == nil || err.Error() != want {
+		t.Fatalf("expected %q, got: %v", want, err)
+	}
+}
+
+func TestSanitizeAWSErrorCode(t *testing.T) {
+	cases := map[string]string{
+		"EngineNotSupportedException":                                   "EngineNotSupportedException",
+		"EngineNotSupportedException:http://internal.amazon.com/coral/": "EngineNotSupportedException",
+		"com.amazonaws.polly#EngineNotSupportedException":               "EngineNotSupportedException",
+		"com.amazonaws.polly#EngineNotSupportedException:http://x/":     "EngineNotSupportedException",
+		" ValidationException ":                                         "ValidationException",
+		"":                                                              "",
+	}
+	for in, want := range cases {
+		if got := sanitizeAWSErrorCode(in); got != want {
+			t.Fatalf("sanitizeAWSErrorCode(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestNormalizeAWSLanguageCode(t *testing.T) {
+	cases := map[string]string{
+		"en-US":     "en-US",
+		"en-us":     "en-US",
+		"EN-US":     "en-US",
+		" en-gb ":   "en-GB",
+		"en-gb-wls": "en-GB-WLS",
+		"cmn-cn":    "cmn-CN",
+		"Yue-cn":    "yue-CN",
+		"ARB":       "arb",
+		"":          "",
+	}
+	for in, want := range cases {
+		if got := normalizeAWSLanguageCode(in); got != want {
+			t.Fatalf("normalizeAWSLanguageCode(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
 
@@ -373,8 +432,12 @@ func TestAWSListVoicesParsesAndFiltersCaseInsensitively(t *testing.T) {
 		if r.Method != http.MethodGet || r.URL.Path != awsPathVoices {
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
-		if got := r.URL.Query().Get("LanguageCode"); got != "EN-us" {
+		// The user's "EN-us" must be sent as Polly's enum spelling "en-US".
+		if got := r.URL.Query().Get("LanguageCode"); got != "en-US" {
 			t.Fatalf("unexpected LanguageCode query: %q", got)
+		}
+		if got := r.URL.Query().Get("IncludeAdditionalLanguageCodes"); got != "true" {
+			t.Fatalf("unexpected IncludeAdditionalLanguageCodes query: %q", got)
 		}
 		if r.Header.Get("Authorization") == "" {
 			t.Fatal("missing Authorization header")
@@ -424,8 +487,10 @@ func TestAWSListVoicesMatchesAdditionalLanguageCodes(t *testing.T) {
 
 func TestAWSListVoicesEmptyLangReturnsAllAndOmitsParam(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, present := r.URL.Query()["LanguageCode"]; present {
-			t.Fatalf("expected no LanguageCode query, got %q", r.URL.RawQuery)
+		for _, key := range []string{"LanguageCode", "IncludeAdditionalLanguageCodes"} {
+			if _, present := r.URL.Query()[key]; present {
+				t.Fatalf("expected no %s query, got %q", key, r.URL.RawQuery)
+			}
 		}
 		fmt.Fprint(w, awsDescribeVoicesFixture)
 	}))
@@ -706,6 +771,31 @@ func TestSigV4SignIsDeterministicAndPayloadSensitive(t *testing.T) {
 	}
 	if !strings.HasPrefix(first, "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20150830/us-east-1/polly/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=") {
 		t.Fatalf("unexpected Authorization shape: %q", first)
+	}
+}
+
+// A request that carries Content-Type signs it; one without does not list it.
+func TestSigV4SignIncludesContentTypeOnlyWhenPresent(t *testing.T) {
+	c := NewAWSClient(sigV4TestAccessKey, sigV4TestSecretKey, "us-east-1", nil)
+	c.now = func() time.Time { return sigV4TestTime }
+
+	withCT, err := http.NewRequest(http.MethodPost, "https://polly.us-east-1.amazonaws.com/v1/speech", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	withCT.Header.Set("Content-Type", "application/json")
+	c.sign(withCT, []byte("{}"))
+	if auth := withCT.Header.Get("Authorization"); !strings.Contains(auth, "SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date,") {
+		t.Fatalf("content-type not signed: %q", auth)
+	}
+
+	withoutCT, err := http.NewRequest(http.MethodGet, "https://polly.us-east-1.amazonaws.com/v1/voices", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.sign(withoutCT, nil)
+	if auth := withoutCT.Header.Get("Authorization"); !strings.Contains(auth, "SignedHeaders=host;x-amz-content-sha256;x-amz-date,") {
+		t.Fatalf("unexpected signed headers without content-type: %q", auth)
 	}
 }
 
