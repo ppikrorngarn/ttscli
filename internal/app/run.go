@@ -67,7 +67,7 @@ func Run(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("create provider: %w", err)
 	}
-	cfg = resolveProfileDefaults(cfg, profile)
+	cfg = resolveProfileDefaults(cfg, profile, provider)
 
 	// Execute with provider
 	return runWithProvider(cfg, provider, stdout, stderr)
