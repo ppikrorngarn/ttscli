@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/ppikrorngarn/ttscli/internal/cli"
 	"github.com/ppikrorngarn/ttscli/internal/config"
 	"github.com/ppikrorngarn/ttscli/internal/tts"
 )
@@ -20,11 +19,16 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 	reader := bufio.NewReader(setupInput)
 
 	fmt.Fprintln(stdout, "Welcome to ttscli setup!")
-	fmt.Fprintln(stdout, "This guided setup will create a Google Cloud profile for text-to-speech.")
+
+	spec, err := chooseSetupProvider(reader, stdout)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "This guided setup will create a %s profile for text-to-speech.\n", spec.DisplayName)
 	fmt.Fprintln(stdout)
 
 	profileName := "default"
-	profileKey := "gcp:" + profileName
+	profileKey := spec.Name + ":" + profileName
 
 	if len(appCfg.Profiles) > 0 {
 		fmt.Fprintln(stdout, "You already have profiles configured.")
@@ -38,7 +42,7 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 		}
 
 		var buildErr error
-		profileKey, _, profileName, buildErr = config.BuildProfileKey("gcp", profileName)
+		profileKey, _, profileName, buildErr = config.BuildProfileKey(spec.Name, profileName)
 		if buildErr != nil {
 			return buildErr
 		}
@@ -49,45 +53,39 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 		}
 	}
 
-	fmt.Fprintf(stdout, "Note: Press Enter to use the built-in defaults (%s / %s).\n", cli.DefaultLanguage, cli.DefaultVoice)
+	fmt.Fprintf(stdout, "Note: Press Enter to use the built-in defaults (%s / %s).\n", spec.DefaultLang, spec.DefaultVoice)
 	fmt.Fprintln(stdout)
 
-	inputAPIKey, err := promptPassword(reader, stdout, "Enter your Google Cloud API key: ")
+	creds, err := promptCredentials(reader, stdout, spec)
 	if err != nil {
-		return fmt.Errorf("read api key: %w", err)
-	}
-	apiKey := strings.TrimSpace(inputAPIKey)
-	if apiKey == "" {
-		return fmt.Errorf("API key is required. You can create one in Google Cloud Console under APIs & Services > Credentials")
+		return err
 	}
 
-	inputLang, err := promptLine(reader, stdout, fmt.Sprintf("Default language code [%s]: ", cli.DefaultLanguage))
+	inputLang, err := promptLine(reader, stdout, fmt.Sprintf("Default language code [%s]: ", spec.DefaultLang))
 	if err != nil {
 		return fmt.Errorf("read language: %w", err)
 	}
 	lang := strings.TrimSpace(inputLang)
 	if lang == "" {
-		lang = cli.DefaultLanguage
+		lang = spec.DefaultLang
 	}
 
-	inputVoice, err := promptLine(reader, stdout, fmt.Sprintf("Default voice name [%s]: ", cli.DefaultVoice))
+	inputVoice, err := promptLine(reader, stdout, fmt.Sprintf("Default voice name [%s]: ", spec.DefaultVoice))
 	if err != nil {
 		return fmt.Errorf("read voice: %w", err)
 	}
 	voice := strings.TrimSpace(inputVoice)
 	if voice == "" {
-		voice = cli.DefaultVoice
+		voice = spec.DefaultVoice
 	}
 
 	fmt.Fprintln(stdout)
 	fmt.Fprintln(stdout, "Validating API key and voice configuration...")
 
 	profile := config.Profile{
-		Provider: "gcp",
-		Name:     profileName,
-		Credentials: map[string]interface{}{
-			"apiKey": apiKey,
-		},
+		Provider:    spec.Name,
+		Name:        profileName,
+		Credentials: creds,
 		Defaults: map[string]string{
 			"lang":  lang,
 			"voice": voice,
@@ -112,7 +110,7 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 
 	appCfg.Profiles[profileKey] = profile
 	if appCfg.ActiveProvider == "" && appCfg.ActiveProfile == "" {
-		appCfg.ActiveProvider = "gcp"
+		appCfg.ActiveProvider = spec.Name
 		appCfg.ActiveProfile = profileName
 	}
 
@@ -155,8 +153,10 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 	fmt.Fprintf(stdout, "Created profile: %s\n", profileKey)
 	fmt.Fprintf(stdout, "  Voice:     %s\n", voice)
 	fmt.Fprintf(stdout, "  Language:  %s\n", lang)
-	fmt.Fprintf(stdout, "  API Key:   %s\n", maskAPIKey(apiKey))
-	if appCfg.ActiveProvider == "gcp" && appCfg.ActiveProfile == profileName {
+	for _, line := range credentialLines(profile) {
+		fmt.Fprintf(stdout, "  %-10s %s\n", line.label+":", line.value)
+	}
+	if appCfg.ActiveProvider == spec.Name && appCfg.ActiveProfile == profileName {
 		fmt.Fprintln(stdout, "  Status:    Active")
 	}
 	fmt.Fprintln(stdout)
@@ -167,4 +167,97 @@ func runSetupCommand(stdout, stderr io.Writer) error {
 	fmt.Fprintln(stdout, "  • Run 'ttscli voices' to list available voices")
 	fmt.Fprintln(stdout, "  • Run 'ttscli doctor' to verify your configuration")
 	return nil
+}
+
+// chooseSetupProvider picks the provider for setup. With a single implemented
+// provider it is used silently; otherwise the user is asked.
+func chooseSetupProvider(reader *bufio.Reader, stdout io.Writer) (tts.Spec, error) {
+	names := providerNames()
+	if len(names) == 0 {
+		return tts.Spec{}, fmt.Errorf("no text-to-speech providers are available in this build")
+	}
+	if len(names) == 1 {
+		spec, ok := lookupSpec(names[0])
+		if !ok {
+			return tts.Spec{}, fmt.Errorf("provider %q is registered but has no spec", names[0])
+		}
+		return spec, nil
+	}
+
+	defaultName := names[0]
+	for _, name := range names {
+		if name == "gcp" {
+			defaultName = name
+			break
+		}
+	}
+	fmt.Fprintf(stdout, "Available providers: %s\n", strings.Join(names, ", "))
+	input, err := promptLine(reader, stdout, fmt.Sprintf("Provider [%s]: ", defaultName))
+	if err != nil {
+		return tts.Spec{}, fmt.Errorf("read provider: %w", err)
+	}
+	name := strings.ToLower(strings.TrimSpace(input))
+	if name == "" {
+		name = defaultName
+	}
+	if err := validateProviderName(name); err != nil {
+		return tts.Spec{}, err
+	}
+	spec, ok := lookupSpec(name)
+	if !ok {
+		return tts.Spec{}, fmt.Errorf("provider %q is registered but has no spec", name)
+	}
+	return spec, nil
+}
+
+// promptCredentials asks for every credential the provider declares. Secret
+// fields use the masked password prompt.
+func promptCredentials(reader *bufio.Reader, stdout io.Writer, spec tts.Spec) (map[string]interface{}, error) {
+	creds := make(map[string]interface{}, len(spec.Credentials))
+	for _, field := range spec.Credentials {
+		prompt := field.Prompt
+		if strings.TrimSpace(prompt) == "" {
+			prompt = fmt.Sprintf("Enter your %s %s: ", spec.DisplayName, strings.ToLower(credentialLabel(field.Key)))
+		}
+		var (
+			input string
+			err   error
+		)
+		if field.Secret {
+			input, err = promptPassword(reader, stdout, prompt)
+		} else {
+			input, err = promptLine(reader, stdout, prompt)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", strings.ToLower(credentialLabel(field.Key)), err)
+		}
+		value := strings.TrimSpace(input)
+		if value == "" {
+			return nil, missingCredentialError(field, true)
+		}
+		creds[field.Key] = value
+	}
+	return creds, nil
+}
+
+// missingCredentialError explains how to supply a required credential.
+// interactive selects the wording for setup; otherwise the flag form is named.
+func missingCredentialError(field tts.CredentialField, interactive bool) error {
+	label := credentialLabel(field.Key)
+	if label == "API Key" {
+		label = "API key"
+	}
+	var how string
+	switch {
+	case interactive:
+		how = fmt.Sprintf("%s is required", label)
+	case field.Key == "apiKey":
+		how = "--api-key is required"
+	default:
+		how = fmt.Sprintf("--credential %s=VALUE is required", field.Key)
+	}
+	if strings.TrimSpace(field.Help) != "" {
+		return fmt.Errorf("%s. %s", how, field.Help)
+	}
+	return fmt.Errorf("%s", how)
 }

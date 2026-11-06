@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -88,6 +89,9 @@ func stubAppDeps() func() {
 	oldCurrentGOOS := currentGOOS
 	oldLookPathCmd := lookPathCmd
 	oldNewProvider := newProvider
+	oldLookupSpec := lookupSpec
+	oldProviderNames := providerNames
+	oldValidateProviderName := validateProviderName
 	oldLoadConfig := loadConfig
 	oldSaveConfig := saveConfig
 	oldGetProfile := getProfile
@@ -140,6 +144,9 @@ func stubAppDeps() func() {
 		currentGOOS = oldCurrentGOOS
 		lookPathCmd = oldLookPathCmd
 		newProvider = oldNewProvider
+		lookupSpec = oldLookupSpec
+		providerNames = oldProviderNames
+		validateProviderName = oldValidateProviderName
 		loadConfig = oldLoadConfig
 		saveConfig = oldSaveConfig
 		getProfile = oldGetProfile
@@ -148,5 +155,46 @@ func stubAppDeps() func() {
 		playAudio = oldPlayAudio
 		setupInput = oldSetupInput
 		newAppCtx = oldNewAppCtx
+	}
+}
+
+// fakeSpec is a second provider used to prove the app layer is provider-agnostic.
+// It declares one secret and one plain credential.
+var fakeSpec = tts.Spec{
+	Name:        "fake",
+	DisplayName: "Fake Speech",
+	Credentials: []tts.CredentialField{
+		{Key: "token", Prompt: "Enter your Fake Speech token: ", Help: "Get a token from the fake console", Secret: true},
+		{Key: "region", Prompt: "Fake Speech region: ", Help: "Pick a region such as eastus"},
+	},
+	DefaultLang:  "xx-XX",
+	DefaultVoice: "xx-XX-Fake-1",
+	New: func(creds map[string]string, _ *http.Client) (tts.Provider, error) {
+		return &fakeTTSClient{
+			listVoicesFn: func(context.Context, string) ([]tts.Voice, error) {
+				return []tts.Voice{{Name: "xx-XX-Fake-1"}}, nil
+			},
+			synthesizeFn: func(context.Context, string, string, string, string) ([]byte, error) {
+				return []byte("audio"), nil
+			},
+		}, nil
+	},
+}
+
+// stubFakeProvider makes the registry seams report gcp plus the fake provider.
+// Call after stubAppDeps so its reset restores the real functions.
+func stubFakeProvider() {
+	gcpSpec, _ := tts.Lookup("gcp")
+	specs := map[string]tts.Spec{"gcp": gcpSpec, "fake": fakeSpec}
+	lookupSpec = func(name string) (tts.Spec, bool) {
+		spec, ok := specs[name]
+		return spec, ok
+	}
+	providerNames = func() []string { return []string{"fake", "gcp"} }
+	validateProviderName = func(name string) error {
+		if _, ok := specs[name]; ok {
+			return nil
+		}
+		return tts.ValidateName(name)
 	}
 }

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-
-	"github.com/ppikrorngarn/ttscli/internal/cli"
 )
 
 type doctorCheck struct {
@@ -118,7 +116,10 @@ func runDoctorCommand(stdout io.Writer) error {
 					})
 
 					ctx, stop := newAppCtx()
-					testLang := cli.DefaultLanguage
+					testLang := "en-US"
+					if spec, ok := lookupSpec(profile.Provider); ok && spec.DefaultLang != "" {
+						testLang = spec.DefaultLang
+					}
 					if lang, ok := profile.Defaults["lang"]; ok && lang != "" {
 						testLang = lang
 					}

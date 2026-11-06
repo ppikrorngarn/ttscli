@@ -20,20 +20,23 @@ import (
 const setupSoundCheckText = "Setup complete. This is a sound check from ttscli."
 
 var (
-	parseArgs              = cli.ParseArgs
-	lookupEnv              = os.Getenv
-	currentGOOS            = func() string { return runtime.GOOS }
-	lookPathCmd            = exec.LookPath
-	newProvider            = newProviderImpl
-	loadConfig             = config.LoadConfig
-	saveConfig             = config.SaveConfig
-	getProfile             = config.GetProfile
-	printVoices            = printVoicesImpl
-	writeFile              = os.WriteFile
-	playAudio              = player.PlayAudio
-	setupInput   io.Reader = os.Stdin
-	readPassword           = readPasswordImpl
-	newAppCtx              = func() (context.Context, context.CancelFunc) {
+	parseArgs                      = cli.ParseArgs
+	lookupEnv                      = os.Getenv
+	currentGOOS                    = func() string { return runtime.GOOS }
+	lookPathCmd                    = exec.LookPath
+	newProvider                    = newProviderImpl
+	lookupSpec                     = tts.Lookup
+	providerNames                  = tts.Names
+	validateProviderName           = tts.ValidateName
+	loadConfig                     = config.LoadConfig
+	saveConfig                     = config.SaveConfig
+	getProfile                     = config.GetProfile
+	printVoices                    = printVoicesImpl
+	writeFile                      = os.WriteFile
+	playAudio                      = player.PlayAudio
+	setupInput           io.Reader = os.Stdin
+	readPassword                   = readPasswordImpl
+	newAppCtx                      = func() (context.Context, context.CancelFunc) {
 		return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	}
 )
