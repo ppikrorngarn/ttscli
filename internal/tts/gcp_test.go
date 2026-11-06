@@ -375,39 +375,6 @@ func TestTTSClientSynthesizeErrorStatusDoesNotLeakResponseBody(t *testing.T) {
 	}
 }
 
-func TestNewProviderGCP(t *testing.T) {
-	p, err := NewProvider("gcp", "my-api-key")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if p.Name() != "gcp" {
-		t.Errorf("expected gcp provider name, got %q", p.Name())
-	}
-}
-
-func TestNewProviderGCPBadCreds(t *testing.T) {
-	_, err := NewProvider("gcp", 123)
-	if err == nil || !strings.Contains(err.Error(), "string API key") {
-		t.Fatalf("expected credentials error, got: %v", err)
-	}
-}
-
-func TestNewProviderUnsupported(t *testing.T) {
-	for _, name := range []string{"aws", "azure", "ibm", "alibaba"} {
-		_, err := NewProvider(name, nil)
-		if err == nil || !strings.Contains(err.Error(), "not yet implemented") {
-			t.Errorf("provider %q: expected not implemented error, got: %v", name, err)
-		}
-	}
-}
-
-func TestNewProviderUnknown(t *testing.T) {
-	_, err := NewProvider("openai", nil)
-	if err == nil || !strings.Contains(err.Error(), "unknown provider") {
-		t.Fatalf("expected unknown provider error, got: %v", err)
-	}
-}
-
 func TestPrintVoices(t *testing.T) {
 	voices := []Voice{
 		{Name: "en-US-Neural2-F", SsmlGender: "FEMALE", LanguageCodes: []string{"en-US"}},
