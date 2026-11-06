@@ -18,10 +18,9 @@ const (
 	defaultHTTPTimeout = 30 * time.Second
 	apiPathSynthesize  = "/v1/text:synthesize"
 	apiPathVoices      = "/v1/voices"
-	AudioEncodingMP3   = "MP3"
 )
 
-type Client struct {
+type GCPClient struct {
 	baseURL    string
 	apiKey     string
 	httpClient *http.Client
@@ -51,44 +50,36 @@ type listVoicesResponse struct {
 	Voices []Voice `json:"voices"`
 }
 
-type Voice struct {
-	LanguageCodes []string `json:"languageCodes"`
-	Name          string   `json:"name"`
-	SsmlGender    string   `json:"ssmlGender"`
-}
-
-func NewClient(apiKey string, httpClient *http.Client) *Client {
+// NewGCPClient returns a Google Cloud Text-to-Speech provider authenticated with an API key.
+// A nil httpClient selects a default client with a 30 second timeout.
+func NewGCPClient(apiKey string, httpClient *http.Client) *GCPClient {
 	client := httpClient
 	if client == nil {
 		client = &http.Client{Timeout: defaultHTTPTimeout}
 	}
-	return &Client{
+	return &GCPClient{
 		baseURL:    GoogleTTSBaseURL,
 		apiKey:     apiKey,
 		httpClient: client,
 	}
 }
 
-func NewGCPClient(apiKey string, httpClient *http.Client) *Client {
-	return NewClient(apiKey, httpClient)
-}
-
-func (c *Client) Name() string {
+func (c *GCPClient) Name() string {
 	return "gcp"
 }
 
-func (c *Client) SynthesizeRequest(ctx context.Context, req SynthRequest) ([]byte, error) {
+func (c *GCPClient) SynthesizeRequest(ctx context.Context, req SynthRequest) ([]byte, error) {
 	return c.Synthesize(ctx, req.Text, req.LanguageCode, req.VoiceName, req.AudioEncoding)
 }
 
-func (c *Client) DefaultVoice(langCode string) string {
+func (c *GCPClient) DefaultVoice(langCode string) string {
 	if langCode == "en-US" {
 		return "en-US-Neural2-F"
 	}
 	return ""
 }
 
-func (c *Client) Synthesize(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
+func (c *GCPClient) Synthesize(ctx context.Context, text, languageCode, voiceName, audioEncoding string) ([]byte, error) {
 	var reqBody synthesizeRequest
 	reqBody.Input.Text = text
 	reqBody.Voice.LanguageCode = languageCode
@@ -131,7 +122,7 @@ func (c *Client) Synthesize(ctx context.Context, text, languageCode, voiceName, 
 	return audioBytes, nil
 }
 
-func (c *Client) ListVoices(ctx context.Context, langCode string) ([]Voice, error) {
+func (c *GCPClient) ListVoices(ctx context.Context, langCode string) ([]Voice, error) {
 	extraParams := url.Values{}
 	if langCode != "" {
 		extraParams.Set("languageCode", langCode)
@@ -160,7 +151,7 @@ func (c *Client) ListVoices(ctx context.Context, langCode string) ([]Voice, erro
 	return parsed.Voices, nil
 }
 
-func (c *Client) buildRequestURL(path string, extraParams url.Values) (string, error) {
+func (c *GCPClient) buildRequestURL(path string, extraParams url.Values) (string, error) {
 	baseURL, err := url.Parse(c.baseURL)
 	if err != nil {
 		return "", err
@@ -180,7 +171,7 @@ func (c *Client) buildRequestURL(path string, extraParams url.Values) (string, e
 	return baseURL.ResolveReference(ref).String(), nil
 }
 
-func (c *Client) do(req *http.Request) ([]byte, error) {
+func (c *GCPClient) do(req *http.Request) ([]byte, error) {
 	req.Header.Set("X-Goog-Api-Key", c.apiKey)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
