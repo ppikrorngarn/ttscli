@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 )
 
@@ -65,6 +66,45 @@ type Config struct {
 	ProfileName       string
 	DefaultVoice      string
 	DefaultLang       string
+	// Credentials holds extra provider credentials passed as --credential key=value.
+	Credentials map[string]string
+}
+
+// credentialFlag collects repeatable --credential key=value pairs into a map.
+type credentialFlag struct {
+	target *map[string]string
+}
+
+func (c credentialFlag) String() string {
+	if c.target == nil || *c.target == nil {
+		return ""
+	}
+	keys := make([]string, 0, len(*c.target))
+	for k := range *c.target {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, k+"="+(*c.target)[k])
+	}
+	return strings.Join(parts, ",")
+}
+
+func (c credentialFlag) Set(raw string) error {
+	key, value, found := strings.Cut(raw, "=")
+	key = strings.TrimSpace(key)
+	if !found || key == "" {
+		return fmt.Errorf("invalid credential %q. Expected key=value (e.g., region=eastus)", raw)
+	}
+	if *c.target == nil {
+		*c.target = make(map[string]string)
+	}
+	if _, dup := (*c.target)[key]; dup {
+		return fmt.Errorf("credential %q was given more than once", key)
+	}
+	(*c.target)[key] = value
+	return nil
 }
 
 func ParseArgs(args []string, stderr io.Writer) (Config, error) {
@@ -303,9 +343,11 @@ func parseProfileCommand(args []string, stderr io.Writer) (Config, error) {
 	case ProfileCreate:
 		fs := flag.NewFlagSet(appName+" profile create", flag.ContinueOnError)
 		fs.SetOutput(stderr)
-		fs.StringVar(&cfg.APIKey, "api-key", "", "API key for the provider")
+		fs.StringVar(&cfg.APIKey, "api-key", "", "API key for the provider (same as --credential apiKey=KEY)")
 		fs.StringVar(&cfg.APIKey, "k", "", "API key (shorthand)")
-		fs.StringVar(&cfg.Provider, "provider", "", "Provider name (gcp, aws, azure, ibm, alibaba)")
+		fs.Var(credentialFlag{&cfg.Credentials}, "credential", "Provider credential as key=value; repeat for several (e.g., -c region=eastus)")
+		fs.Var(credentialFlag{&cfg.Credentials}, "c", "Provider credential as key=value (shorthand)")
+		fs.StringVar(&cfg.Provider, "provider", "", "Provider name (e.g., gcp)")
 		fs.StringVar(&cfg.Provider, "P", "", "Provider name (shorthand)")
 		fs.StringVar(&cfg.ProfileName, "name", "", "Profile name")
 		fs.StringVar(&cfg.ProfileName, "n", "", "Profile name (shorthand)")
