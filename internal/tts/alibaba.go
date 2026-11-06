@@ -28,6 +28,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -37,6 +38,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -48,6 +50,11 @@ const (
 	alibabaTimestampLayout    = "2006-01-02T15:04:05Z"
 	alibabaTokenExpiryPadding = 60 * time.Second
 	alibabaErrorBodyPreview   = 200
+	// alibabaMaxTextChars is the gateway's documented per-request limit:
+	// "单次请求的文本不超过 300 个字符，超过的字符会被截断" (text over 300
+	// characters is silently truncated). We reject it instead of returning
+	// cut-off audio.
+	alibabaMaxTextChars = 300
 )
 
 // alibabaRegion holds the per-region endpoints. The two public regions use
@@ -229,6 +236,9 @@ func (c *AlibabaClient) SynthesizeRequest(ctx context.Context, req SynthRequest)
 	if voice == "" {
 		return nil, fmt.Errorf("alibaba has no default voice for language %q; pass one with --voice (see ttscli voices)", req.LanguageCode)
 	}
+	if n := utf8.RuneCountInString(req.Text); n > alibabaMaxTextChars {
+		return nil, fmt.Errorf("alibaba accepts at most %d characters per request, got %d; the gateway would truncate the audio, split the text instead", alibabaMaxTextChars, n)
+	}
 
 	token, err := c.getToken(ctx)
 	if err != nil {
@@ -346,7 +356,13 @@ func (c *AlibabaClient) createToken(ctx context.Context) (string, time.Time, err
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", time.Time{}, fmt.Errorf("create token: http call: %w", err)
+		// A *url.Error carries the full request URL, including AccessKeyId,
+		// the nonce and the Signature; report only the host and the cause.
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			err = urlErr.Err
+		}
+		return "", time.Time{}, fmt.Errorf("create token: http call to %s: %w", c.metaBaseURL, err)
 	}
 	defer resp.Body.Close()
 
@@ -565,7 +581,7 @@ var alibabaVoices = []alibabaVoice{
 	{"yuer", "zh-CN", "FEMALE"},
 	// Literature / narration scenarios.
 	{"aiyuan", "zh-CN", "FEMALE"},
-	{"aiying", "zh-CN", "NEUTRAL"},
+	{"aiying", "zh-CN", "FEMALE"},
 	{"aixiang", "zh-CN", "MALE"},
 	{"aimo", "zh-CN", "MALE"},
 	{"aiye", "zh-CN", "MALE"},

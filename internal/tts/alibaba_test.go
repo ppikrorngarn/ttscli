@@ -383,6 +383,60 @@ func TestAlibabaSynthesizeRequiresVoiceForNonDefaultLanguage(t *testing.T) {
 	}
 }
 
+func TestAlibabaSynthesizeRejectsTextOverDocumentedLimit(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("no request expected, got %s %s", r.Method, r.URL.Path)
+	}))
+	defer srv.Close()
+
+	c := newAlibabaTestClient(t, srv)
+	// 301 multi-byte runes: the limit counts characters, not bytes.
+	text := strings.Repeat("你", alibabaMaxTextChars+1)
+	_, err := c.SynthesizeRequest(context.Background(), SynthRequest{Text: text, VoiceName: "xiaoyun", AudioEncoding: AudioEncodingMP3})
+	if err == nil || !strings.Contains(err.Error(), "at most 300 characters") || !strings.Contains(err.Error(), "got 301") {
+		t.Fatalf("expected text-limit error, got: %v", err)
+	}
+}
+
+func TestAlibabaSynthesizeAcceptsTextAtDocumentedLimit(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			alibabaServeToken(t, w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "audio/mpeg")
+		w.Write([]byte("mp3"))
+	}))
+	defer srv.Close()
+
+	c := newAlibabaTestClient(t, srv)
+	// Exactly 300 runes, more than 300 bytes.
+	text := strings.Repeat("你", alibabaMaxTextChars)
+	if _, err := c.SynthesizeRequest(context.Background(), SynthRequest{Text: text, VoiceName: "xiaoyun", AudioEncoding: AudioEncodingMP3}); err != nil {
+		t.Fatalf("300-character text must be accepted: %v", err)
+	}
+}
+
+func TestAlibabaCreateTokenTransportErrorHidesSignedQuery(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	c := newAlibabaTestClient(t, srv)
+	srv.Close() // connection refused on the first token call
+
+	_, err := c.SynthesizeRequest(context.Background(), SynthRequest{Text: "hi", VoiceName: "xiaoyun", AudioEncoding: AudioEncodingMP3})
+	if err == nil {
+		t.Fatal("expected transport error")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "create token: http call to "+srv.URL) {
+		t.Errorf("error should name the meta host: %s", msg)
+	}
+	for _, secret := range []string{"Signature=", "AccessKeyId=", alibabaDocNonce, alibabaDocSecret} {
+		if strings.Contains(msg, secret) {
+			t.Errorf("error leaks %q: %s", secret, msg)
+		}
+	}
+}
+
 func TestAlibabaSynthesizeRejectsNonMP3Encoding(t *testing.T) {
 	c := NewAlibabaClient("id", "secret", "appkey", "cn-shanghai", nil)
 	_, err := c.SynthesizeRequest(context.Background(), SynthRequest{Text: "hi", VoiceName: "xiaoyun", AudioEncoding: "LINEAR16"})
