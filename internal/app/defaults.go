@@ -10,20 +10,30 @@ import (
 	"github.com/ppikrorngarn/ttscli/internal/tts"
 )
 
-// resolveProfileDefaults fills in language and voice when flags were not given:
-// profile defaults first, then the provider's own default voice for the
-// resolved language. A nil provider skips that last step.
+// resolveProfileDefaults fills in language and voice when flags were not given.
+// Language: flag, then profile default. Voice: flag, then the profile default
+// voice (only while the resolved language is the one that voice was saved
+// for), then the provider's own default voice for the resolved language. A nil
+// provider skips that last step.
 func resolveProfileDefaults(cfg cli.Config, profile config.Profile, provider tts.Provider) cli.Config {
-	if !cfg.HasVoiceFlag && profile.Defaults["voice"] != "" {
-		cfg.Voice = profile.Defaults["voice"]
-	}
 	if !cfg.HasLangFlag && profile.Defaults["lang"] != "" {
 		cfg.Lang = profile.Defaults["lang"]
+	}
+	if !cfg.HasVoiceFlag && profile.Defaults["voice"] != "" && profileVoiceMatchesLang(profile, cfg.Lang) {
+		cfg.Voice = profile.Defaults["voice"]
 	}
 	if cfg.Voice == "" && provider != nil {
 		cfg.Voice = provider.DefaultVoice(cfg.Lang)
 	}
 	return cfg
+}
+
+// profileVoiceMatchesLang reports whether the profile's default voice may be
+// used for lang: either the profile has no default language, or it matches.
+// A voice saved for en-US must not be forced onto a --lang fr-FR request.
+func profileVoiceMatchesLang(profile config.Profile, lang string) bool {
+	profileLang := profile.Defaults["lang"]
+	return profileLang == "" || strings.EqualFold(profileLang, lang)
 }
 
 // credentialLabel turns a credential key into a display label: "apiKey" -> "API Key",

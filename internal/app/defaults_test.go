@@ -122,13 +122,27 @@ func TestResolveProfileDefaults(t *testing.T) {
 		t.Errorf("expected lang from profile, got %q", cfg2.Lang)
 	}
 
-	// Lang flag set — lang kept, voice from profile.
+	// Lang flag set to another language — lang kept, and the profile's en-US
+	// voice must not be applied to an en-GB request.
 	cfg3 := resolveProfileDefaults(cli.Config{Lang: "en-GB", HasLangFlag: true}, profile, nil)
 	if cfg3.Lang != "en-GB" {
 		t.Errorf("expected en-GB to be kept, got %q", cfg3.Lang)
 	}
-	if cfg3.Voice != "en-US-Neural2-F" {
-		t.Errorf("expected voice from profile, got %q", cfg3.Voice)
+	if cfg3.Voice != "" {
+		t.Errorf("expected profile voice to be skipped for a different language, got %q", cfg3.Voice)
+	}
+
+	// Lang flag set to the profile's own language — profile voice still applies.
+	cfg3b := resolveProfileDefaults(cli.Config{Lang: "en-us", HasLangFlag: true}, profile, nil)
+	if cfg3b.Voice != "en-US-Neural2-F" {
+		t.Errorf("expected profile voice for matching language (case-insensitive), got %q", cfg3b.Voice)
+	}
+
+	// Profile with a voice but no language: voice applies to any request.
+	voiceOnly := config.Profile{Defaults: map[string]string{"voice": "any-voice"}}
+	cfg3c := resolveProfileDefaults(cli.Config{Lang: "fr-FR", HasLangFlag: true}, voiceOnly, nil)
+	if cfg3c.Voice != "any-voice" {
+		t.Errorf("expected voice-only profile default to apply, got %q", cfg3c.Voice)
 	}
 
 	// Both flags set — both kept.
