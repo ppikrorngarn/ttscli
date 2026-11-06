@@ -52,6 +52,24 @@ const ibmVoicesFixture = `{
       "customizable": true,
       "supported_features": {"custom_pronunciation": true, "voice_transformation": false},
       "url": "https://api.us-south.text-to-speech.watson.cloud.ibm.com/instances/0a1b2c3d/v1/voices/en-GB_CharlotteV3Voice"
+    },
+    {
+      "name": "de-DE_ErikaV3Voice",
+      "language": "de-DE",
+      "gender": "female",
+      "description": "Erika: Standard German (Standarddeutsch) female voice. Dnn technology.",
+      "customizable": true,
+      "supported_features": {"custom_pronunciation": true, "voice_transformation": false},
+      "url": "https://api.us-south.text-to-speech.watson.cloud.ibm.com/instances/0a1b2c3d/v1/voices/de-DE_ErikaV3Voice"
+    },
+    {
+      "name": "de-DE_BirgitV3Voice",
+      "language": "de-DE",
+      "gender": "female",
+      "description": "Birgit: Standard German (Standarddeutsch) female voice. Dnn technology.",
+      "customizable": true,
+      "supported_features": {"custom_pronunciation": true, "voice_transformation": false},
+      "url": "https://api.us-south.text-to-speech.watson.cloud.ibm.com/instances/0a1b2c3d/v1/voices/de-DE_BirgitV3Voice"
     }
   ]
 }`
@@ -151,6 +169,103 @@ func TestIBMClientSynthesizeOmitsVoiceWhenEmpty(t *testing.T) {
 	_, err := c.SynthesizeRequest(context.Background(), SynthRequest{Text: "hi", AudioEncoding: AudioEncodingMP3})
 	if err != nil {
 		t.Fatalf("SynthesizeRequest returned error: %v", err)
+	}
+}
+
+func TestIBMClientSynthesizeOmitsVoiceForDefaultLanguage(t *testing.T) {
+	c, srv := newIBMTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != ibmInstancePath+ibmPathSynthesize {
+			t.Fatalf("expected no voice lookup, got request to %s", r.URL.Path)
+		}
+		if _, present := r.URL.Query()["voice"]; present {
+			t.Fatalf("expected no voice query, got %q", r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "audio/mp3")
+		w.Write([]byte("mp3"))
+	})
+	defer srv.Close()
+
+	_, err := c.SynthesizeRequest(context.Background(), SynthRequest{Text: "hi", LanguageCode: "en-us", AudioEncoding: AudioEncodingMP3})
+	if err != nil {
+		t.Fatalf("SynthesizeRequest returned error: %v", err)
+	}
+}
+
+func TestIBMClientSynthesizeResolvesVoiceForOtherLanguage(t *testing.T) {
+	var paths []string
+	c, srv := newIBMTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assertIBMBasicAuth(t, r)
+		paths = append(paths, r.URL.Path)
+		switch r.URL.Path {
+		case ibmInstancePath + ibmPathVoices:
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, ibmVoicesFixture)
+		case ibmInstancePath + ibmPathSynthesize:
+			if got := r.URL.Query().Get("voice"); got != "de-DE_BirgitV3Voice" {
+				t.Fatalf("expected first de-DE voice by name, got voice=%q", got)
+			}
+			w.Header().Set("Content-Type", "audio/mp3")
+			w.Write([]byte("mp3"))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+	defer srv.Close()
+
+	got, err := c.SynthesizeRequest(context.Background(), SynthRequest{Text: "hallo", LanguageCode: "de-de", AudioEncoding: AudioEncodingMP3})
+	if err != nil {
+		t.Fatalf("SynthesizeRequest returned error: %v", err)
+	}
+	if string(got) != "mp3" {
+		t.Fatalf("unexpected audio payload: %q", string(got))
+	}
+	if len(paths) != 2 || paths[0] != ibmInstancePath+ibmPathVoices || paths[1] != ibmInstancePath+ibmPathSynthesize {
+		t.Fatalf("expected voices lookup then synthesize, got %v", paths)
+	}
+}
+
+func TestIBMClientSynthesizeNoVoiceForLanguage(t *testing.T) {
+	c, srv := newIBMTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != ibmInstancePath+ibmPathVoices {
+			t.Fatalf("synthesize must not be called without a voice for th-TH, got %s", r.URL.Path)
+		}
+		fmt.Fprint(w, ibmVoicesFixture)
+	})
+	defer srv.Close()
+
+	_, err := c.SynthesizeRequest(context.Background(), SynthRequest{Text: "hi", LanguageCode: "th-TH", AudioEncoding: AudioEncodingMP3})
+	if err == nil || !strings.Contains(err.Error(), `no voice available for language "th-TH"`) {
+		t.Fatalf("expected no-voice error, got: %v", err)
+	}
+}
+
+func TestIBMClientSynthesizeVoiceLookupError(t *testing.T) {
+	c, srv := newIBMTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, `{"code":401,"error":"Unauthorized","code_description":"Unauthorized"}`)
+	})
+	defer srv.Close()
+
+	_, err := c.SynthesizeRequest(context.Background(), SynthRequest{Text: "hi", LanguageCode: "fr-FR", AudioEncoding: AudioEncodingMP3})
+	want := `look up a voice for language "fr-FR": tts request failed with status 401: Unauthorized`
+	if err == nil || err.Error() != want {
+		t.Fatalf("expected %q, got: %v", want, err)
+	}
+}
+
+func TestIBMFormatAPIErrorCodeDescriptionFallback(t *testing.T) {
+	cases := map[string]string{
+		`{"code":404,"error":"Model not found","code_description":"Not Found"}`: "tts request failed with status 404: Model not found",
+		`{"code":404,"code_description":"Not Found"}`:                           "tts request failed with status 404: Not Found",
+		`{"code":404,"error":"","code_description":" Not Found "}`:              "tts request failed with status 404: Not Found",
+		`{"code":404}`: "tts request failed with status 404",
+		`not json`:     "tts request failed with status 404",
+	}
+	for body, want := range cases {
+		if got := formatIBMAPIError(404, []byte(body)).Error(); got != want {
+			t.Fatalf("formatIBMAPIError(%s) = %q, want %q", body, got, want)
+		}
 	}
 }
 
@@ -321,7 +436,7 @@ func TestIBMClientListVoicesEmptyLangReturnsAllSorted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListVoices returned error: %v", err)
 	}
-	wantNames := []string{"en-GB_CharlotteV3Voice", "en-GB_KateV3Voice", "en-US_AllisonV3Voice", "en-US_MichaelV3Voice"}
+	wantNames := []string{"de-DE_BirgitV3Voice", "de-DE_ErikaV3Voice", "en-GB_CharlotteV3Voice", "en-GB_KateV3Voice", "en-US_AllisonV3Voice", "en-US_MichaelV3Voice"}
 	if len(voices) != len(wantNames) {
 		t.Fatalf("expected %d voices, got %#v", len(wantNames), voices)
 	}
@@ -330,8 +445,8 @@ func TestIBMClientListVoicesEmptyLangReturnsAllSorted(t *testing.T) {
 			t.Fatalf("voice %d: expected %q, got %q", i, want, voices[i].Name)
 		}
 	}
-	if voices[3].SsmlGender != "MALE" {
-		t.Fatalf("expected MALE for Michael, got %#v", voices[3])
+	if voices[5].SsmlGender != "MALE" {
+		t.Fatalf("expected MALE for Michael, got %#v", voices[5])
 	}
 }
 
