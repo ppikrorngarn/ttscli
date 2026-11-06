@@ -8,6 +8,8 @@ package tts
 //   - https://docs.aws.amazon.com/general/latest/gr/pol.html (endpoints)
 //   - https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv-create-signed-request.html
 //   - https://github.com/awslabs/aws-c-auth/tree/main/tests/aws-signing-test-suite/v4 (SigV4 vectors)
+//   - github.com/aws/aws-sdk-go-v2/service/polly serializers/deserializers
+//     (query boolean rendering, X-Amzn-ErrorType sanitizing, body error codes)
 
 import (
 	"bytes"
@@ -144,25 +146,44 @@ func (c *AWSClient) SynthesizeRequest(ctx context.Context, req SynthRequest) ([]
 		return nil, fmt.Errorf("unsupported audio encoding %q: Amazon Polly provider only produces %s", req.AudioEncoding, AudioEncodingMP3)
 	}
 
+	// Polly's LanguageCode is a case-sensitive enum (en-US, not en-us).
+	languageCode := normalizeAWSLanguageCode(req.LanguageCode)
+
 	voiceID := req.VoiceName
 	if voiceID == "" {
-		voiceID = c.DefaultVoice(req.LanguageCode)
+		voiceID = c.DefaultVoice(languageCode)
 	}
 	if voiceID == "" {
-		return nil, fmt.Errorf("no voice selected for language %q and Amazon Polly requires one: run `ttscli voices --lang %s` and pass --voice <name>", req.LanguageCode, req.LanguageCode)
+		return nil, fmt.Errorf("no voice selected for language %q and Amazon Polly requires one: run `ttscli voices --lang %s` and pass --voice <name>", languageCode, languageCode)
 	}
 
 	// Neural voices sound better, so try that engine first and fall back to
 	// standard when Polly tells us the voice does not support neural.
-	audio, err := c.synthesize(ctx, req.Text, req.LanguageCode, voiceID, awsEngineNeural)
+	audio, err := c.synthesize(ctx, req.Text, languageCode, voiceID, awsEngineNeural)
 	if err != nil {
 		var apiErr *awsAPIError
 		if errors.As(err, &apiErr) && apiErr.isEngineNotSupported() {
-			return c.synthesize(ctx, req.Text, req.LanguageCode, voiceID, awsEngineStandard)
+			return c.synthesize(ctx, req.Text, languageCode, voiceID, awsEngineStandard)
 		}
 		return nil, err
 	}
 	return audio, nil
+}
+
+// normalizeAWSLanguageCode spells a BCP-47 style tag the way Polly's
+// LanguageCode enum does: lowercase language, uppercase region and variant
+// (en-us -> en-US, en-gb-wls -> en-GB-WLS, arb -> arb).
+func normalizeAWSLanguageCode(code string) string {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return ""
+	}
+	parts := strings.Split(code, "-")
+	parts[0] = strings.ToLower(parts[0])
+	for i := 1; i < len(parts); i++ {
+		parts[i] = strings.ToUpper(parts[i])
+	}
+	return strings.Join(parts, "-")
 }
 
 func (c *AWSClient) synthesize(ctx context.Context, text, languageCode, voiceID, engine string) ([]byte, error) {
@@ -202,12 +223,18 @@ func (c *AWSClient) synthesize(ctx context.Context, text, languageCode, voiceID,
 }
 
 func (c *AWSClient) ListVoices(ctx context.Context, langCode string) ([]Voice, error) {
+	langCode = normalizeAWSLanguageCode(langCode)
+
 	var voices []Voice
 	nextToken := ""
 	for {
 		params := url.Values{}
 		if langCode != "" {
 			params.Set("LanguageCode", langCode)
+			// Without this Polly drops bilingual voices whose requested
+			// language is only one of their AdditionalLanguageCodes (Aditi
+			// for hi-IN). The SDK serializes the boolean as "true".
+			params.Set("IncludeAdditionalLanguageCodes", "true")
 		}
 		if nextToken != "" {
 			params.Set("NextToken", nextToken)
@@ -310,9 +337,10 @@ func previewBody(body []byte) string {
 	return strings.TrimSpace(string(body))
 }
 
-// awsAPIError is a non-2xx answer from Polly. Polly replies with a JSON body
-// {"message": "..."} and the error class in the x-amzn-ErrorType header
-// (sometimes followed by ":<uri>", which we strip).
+// awsAPIError is a non-2xx answer from Polly. Polly speaks the AWS REST-JSON
+// protocol: the error class travels in the x-amzn-ErrorType header (falling
+// back to "code" or "__type" in the body) and the text in a JSON body
+// {"message": "..."}.
 type awsAPIError struct {
 	StatusCode int
 	ErrorType  string
@@ -320,14 +348,45 @@ type awsAPIError struct {
 }
 
 func newAWSAPIError(statusCode int, errorType string, body []byte) *awsAPIError {
-	if idx := strings.Index(errorType, ":"); idx >= 0 {
-		errorType = errorType[:idx]
+	errorType = sanitizeAWSErrorCode(errorType)
+	if errorType == "" {
+		errorType = sanitizeAWSErrorCode(extractAWSBodyErrorCode(body))
 	}
 	return &awsAPIError{
 		StatusCode: statusCode,
-		ErrorType:  strings.TrimSpace(errorType),
+		ErrorType:  errorType,
 		Message:    extractAPIErrorMessage(body),
 	}
+}
+
+// sanitizeAWSErrorCode reduces an error code to its bare name, the same way
+// the AWS SDKs do: "EngineNotSupportedException:http://..." and
+// "com.amazonaws.polly#EngineNotSupportedException" both become
+// "EngineNotSupportedException".
+func sanitizeAWSErrorCode(code string) string {
+	if idx := strings.Index(code, ":"); idx >= 0 {
+		code = code[:idx]
+	}
+	if idx := strings.Index(code, "#"); idx >= 0 {
+		code = code[idx+1:]
+	}
+	return strings.TrimSpace(code)
+}
+
+// extractAWSBodyErrorCode reads the REST-JSON body error code ("code", then
+// "__type") used when the x-amzn-ErrorType header is absent.
+func extractAWSBodyErrorCode(body []byte) string {
+	var parsed struct {
+		Code string `json:"code"`
+		Type string `json:"__type"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return ""
+	}
+	if parsed.Code != "" {
+		return parsed.Code
+	}
+	return parsed.Type
 }
 
 func (e *awsAPIError) Error() string {
@@ -363,8 +422,10 @@ func (e *awsAPIError) isEngineNotSupported() bool {
 //
 // Reference: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv-create-signed-request.html
 // The signer always signs the host, x-amz-content-sha256 and x-amz-date
-// headers of whatever host the request actually targets, so pointing baseURL
-// at a test server produces a valid signature for that server.
+// headers, plus content-type when the request carries one (the reference says
+// it must be in the canonical headers when present). It signs whatever host
+// the request actually targets, so pointing baseURL at a test server produces
+// a valid signature for that server.
 // ---------------------------------------------------------------------------
 
 const (
@@ -393,6 +454,9 @@ func (c *AWSClient) sign(req *http.Request, payload []byte) {
 		"host":                 host,
 		"x-amz-content-sha256": payloadHash,
 		"x-amz-date":           amzDate,
+	}
+	if contentType := req.Header.Get("Content-Type"); contentType != "" {
+		headers["content-type"] = contentType
 	}
 
 	canonical, signedHeaders := sigV4CanonicalRequest(req.Method, req.URL.Path, req.URL.Query(), headers, payloadHash)
