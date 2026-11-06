@@ -26,6 +26,8 @@ make check
 
 4. Update docs when behavior or flags change.
 
+Adding a text-to-speech provider? See "Adding a provider" in the README: one implementation file plus one `Spec` entry in `internal/tts/registry.go`.
+
 ## Commit Style
 
 Use conventional-style prefixes where possible:
