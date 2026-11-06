@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/github/license/ppikrorngarn/ttscli)](LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/ppikrorngarn/ttscli)](https://github.com/ppikrorngarn/ttscli/releases/latest)
 
-A lightweight, fast Command Line Interface (CLI) written in Go to convert text into speech using multiple cloud TTS providers. Currently supports Google Cloud, with planned support for AWS, Azure, IBM Cloud, and Alibaba Cloud.
+A lightweight, fast Command Line Interface (CLI) written in Go to convert text into speech using multiple cloud TTS providers. Supports Google Cloud, Azure Speech, IBM Watson and Alibaba Cloud; Amazon Polly is in progress.
 
 This tool allows you to easily synthesize speech, save it to an MP3 file, or play it directly from your terminal on macOS, Linux, and Windows.
 
@@ -16,9 +16,11 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
 ## Prerequisites
 
 1. **Go:** Install Go `1.25+` (matches `go.mod`).
-2. **Cloud Provider API Key:** You need an API key for your chosen TTS provider.
-   - **Google Cloud:** Go to Google Cloud Console > APIs & Services > Credentials. Create an API Key and restrict it to the "Cloud Text-to-Speech API".
-   - **Other providers:** Support coming soon.
+2. **Cloud Provider Credentials:** You need credentials for your chosen TTS provider.
+   - **Google Cloud:** Google Cloud Console > APIs & Services > Credentials. Create an API Key and restrict it to the "Cloud Text-to-Speech API".
+   - **Azure Speech:** Azure portal > your Speech resource > Keys and Endpoint: a key and the region (e.g. `eastus`).
+   - **IBM Watson:** IBM Cloud > Resource list > your Text to Speech instance > Service credentials: the API key and the service URL.
+   - **Alibaba Cloud:** RAM AccessKey ID and secret, the Intelligent Speech Interaction project Appkey, and the region (`cn-shanghai` or `ap-southeast-1`).
 3. **Audio Player (Linux and Windows):** The `speak` command (alias: `say`) plays MP3 audio and needs an external player. macOS ships with `afplay` by default, so no install is needed there.
    - **Linux:** install one of `mpg123`, `paplay`, or `ffplay`.
      - Ubuntu/Debian: `sudo apt install mpg123`
@@ -117,9 +119,8 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
    ```bash
    ttscli setup
    ```
-    This guided flow asks for the provider's credentials (for Google Cloud: an API key), a default language and a default voice, validates them, and can run a sound check.
-    Press Enter on language/voice prompts to use the provider's built-in defaults (Google Cloud: `en-US` and `en-US-Neural2-F`).
-    When more than one provider is built in, setup first asks which one to use.
+    This guided flow asks which provider to use (Enter picks `gcp`), then for that provider's credentials, a default language and a default voice, validates them, and can run a sound check.
+    Press Enter on language/voice prompts to use the provider's built-in defaults (see the table under "Provider credentials" below).
     **Note:** Secret inputs such as API keys are masked (hidden) as you type or paste.
 
 ### Contributor Setup
@@ -200,11 +201,13 @@ On Windows, the equivalent is typically `ttscli.exe` from a directory such as `%
 3. Error if no active profile is set
 
 **Current Provider Support**:
-- ✅ **Google Cloud (GCP)**: Fully implemented
-- 🚧 **AWS Polly**: Planned
-- 🚧 **Azure Speech**: Planned
-- 🚧 **IBM Watson**: Planned
-- 🚧 **Alibaba Cloud**: Planned
+- ✅ **Google Cloud (`gcp`)**: Implemented and verified against the live service
+- ✅ **Azure Speech (`azure`)**: Implemented; tested against the documented REST API, not yet against a live resource
+- ✅ **IBM Watson (`ibm`)**: Implemented; tested against the documented REST API, not yet against a live instance
+- ✅ **Alibaba Cloud (`alibaba`)**: Implemented; tested against the documented REST API, not yet against a live account
+- 🚧 **Amazon Polly (`aws`)**: In progress
+
+If you run one of the not-yet-live-verified providers and hit a problem, please open an issue with the `ttscli doctor` output.
 
 ### Configuration File
 
@@ -249,7 +252,7 @@ Prefer managing profiles via the `ttscli profile` subcommands (see [Command Refe
 - `ttscli speak` (alias: `ttscli say`): Synthesize text to speech and play it immediately.
 - `ttscli save`: Synthesize text to speech and save MP3 output.
 - `ttscli voices`: List available voices (optionally filter with `--lang`).
-- `ttscli setup`: Interactive first-run setup (creates a GCP profile).
+- `ttscli setup`: Interactive first-run setup (picks a provider and creates its first profile).
 - `ttscli doctor`: Health checks (config, profiles, API connectivity, playback). Returns non-zero when checks fail.
 - `ttscli completion <bash|zsh|fish>`: Prints shell completion script to stdout.
 - `ttscli profile list`: List all configured profiles.
@@ -297,7 +300,28 @@ Prefer managing profiles via the `ttscli profile` subcommands (see [Command Refe
 | `--credential` | `key=value` | none | Any credential the provider declares; repeat for several (e.g. `-c region=eastus`). Alias: `-c`. |
 | `--voice` | string | `""` | Optional default voice to seed into the profile. Alias: `-v`. |
 
-Every credential the chosen provider declares must be supplied. Google Cloud needs only `apiKey`, so `--api-key` is enough. Passing the same key through both `--api-key` and `--credential` is an error.
+Every credential the chosen provider declares must be supplied. Passing the same key through both `--api-key` and `--credential` is an error.
+
+#### Provider credentials
+
+| Provider | `--provider` | Credentials (`--credential key=value`) | Default language / voice |
+| :--- | :--- | :--- | :--- |
+| Google Cloud | `gcp` | `apiKey` (or `--api-key`) | `en-US` / `en-US-Neural2-F` |
+| Azure Speech | `azure` | `subscriptionKey`, `region` (e.g. `eastus`) | `en-US` / `en-US-JennyNeural` |
+| IBM Watson | `ibm` | `apiKey` (or `--api-key`), `url` (service URL) | `en-US` / `en-US_MichaelV3Voice` |
+| Alibaba Cloud | `alibaba` | `accessKeyId`, `accessKeySecret`, `appKey`, `region` (`cn-shanghai` or `ap-southeast-1`) | `zh-CN` / `xiaoyun` |
+
+Examples:
+
+```bash
+ttscli profile create --provider azure --name work -c subscriptionKey=KEY -c region=eastus
+ttscli profile create --provider ibm --name work --api-key KEY -c url=https://api.us-south.text-to-speech.watson.cloud.ibm.com/instances/ID
+ttscli profile create --provider alibaba --name work -c accessKeyId=ID -c accessKeySecret=SECRET -c appKey=APPKEY -c region=cn-shanghai
+```
+
+Provider notes:
+- **Azure** and **Alibaba** need a voice name for every language; `ttscli voices --lang <code>` lists them. Alibaba accepts at most 300 characters per request and ships a static voice list (no list API on the Alibaba side).
+- **IBM** voices are language-specific. Without `--voice`, ttscli picks the first voice IBM lists for the requested language.
 
 ### `profile set` Flags
 
@@ -392,7 +416,7 @@ ttscli voices -l en-GB
 
 ### Voice and Language Selection
 
-Voice resolution is: `--voice` flag, then the profile's default voice, then the provider's default for the language (Google Cloud: `en-US-Neural2-F` for `en-US`). Customize with the `--lang` and `--voice` flags or `ttscli profile set`.
+Voice resolution is: `--voice` flag, then the profile's default voice, then the provider's default for the language (see the "Provider credentials" table). Customize with the `--lang` and `--voice` flags or `ttscli profile set`.
 
 **Example: British Male Voice:**
 ```bash
@@ -436,7 +460,7 @@ internal/player/     Cross-platform audio playback. macOS: afplay. Linux: mpg123
                      Windows: mpg123 or ffplay (requires install).
 internal/tts/        Provider interface and shared types (provider.go), the provider registry
                      with per-provider credential specs (registry.go), and one file per
-                     provider implementation (gcp.go).
+                     provider implementation (gcp.go, azure.go, ibm.go, alibaba.go).
 ```
 
 Packages under `internal/` use small, package-level function variables (e.g. `readFile`, `writeFile`, `lookupEnv`) for dependency injection, so tests can stub the filesystem, environment, and HTTP calls without real I/O.
