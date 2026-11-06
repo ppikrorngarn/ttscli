@@ -27,20 +27,75 @@ func TestMaskAPIKey(t *testing.T) {
 	}
 }
 
-func TestResolveProfileAPIKey(t *testing.T) {
+func TestCredentialString(t *testing.T) {
 	p := config.Profile{Credentials: map[string]interface{}{"apiKey": "  mykey  "}}
-	if got := resolveProfileAPIKey(p); got != "mykey" {
+	if got := credentialString(p, "apiKey"); got != "mykey" {
 		t.Errorf("expected mykey, got %q", got)
 	}
+	if got := credentialString(config.Profile{}, "apiKey"); got != "" {
+		t.Errorf("expected empty string for nil credentials, got %q", got)
+	}
+	p3 := config.Profile{Credentials: map[string]interface{}{"apiKey": 123}}
+	if got := credentialString(p3, "apiKey"); got != "" {
+		t.Errorf("expected empty string for wrong type, got %q", got)
+	}
+}
 
-	p2 := config.Profile{Credentials: map[string]interface{}{}}
-	if got := resolveProfileAPIKey(p2); got != "" {
-		t.Errorf("expected empty string, got %q", got)
+func TestCredentialLabel(t *testing.T) {
+	for key, want := range map[string]string{
+		"apiKey":          "API Key",
+		"region":          "Region",
+		"subscriptionKey": "Subscription Key",
+		"token":           "Token",
+	} {
+		if got := credentialLabel(key); got != want {
+			t.Errorf("credentialLabel(%q) = %q, want %q", key, got, want)
+		}
+	}
+}
+
+func TestCredentialLinesKnownProviderMasksSecrets(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	p := config.Profile{Provider: "gcp", Credentials: map[string]interface{}{"apiKey": "secret-1234"}}
+	lines := credentialLines(p)
+	if len(lines) != 1 || lines[0].label != "API Key" || lines[0].value != "****1234" {
+		t.Fatalf("unexpected lines: %+v", lines)
+	}
+}
+
+func TestCredentialLinesSecretAndPlainFields(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+	stubFakeProvider()
+
+	p := config.Profile{Provider: "fake", Credentials: map[string]interface{}{"token": "tok-9999", "region": "eastus"}}
+	lines := credentialLines(p)
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 lines, got %+v", lines)
+	}
+	if lines[0].label != "Token" || lines[0].value != "****9999" {
+		t.Errorf("secret field not masked: %+v", lines[0])
+	}
+	if lines[1].label != "Region" || lines[1].value != "eastus" {
+		t.Errorf("plain field should be shown: %+v", lines[1])
 	}
 
-	p3 := config.Profile{Credentials: map[string]interface{}{"apiKey": 123}}
-	if got := resolveProfileAPIKey(p3); got != "" {
-		t.Errorf("expected empty string for wrong type, got %q", got)
+	missing := credentialLines(config.Profile{Provider: "fake", Credentials: map[string]interface{}{"token": "tok-9999"}})
+	if missing[1].value != "(not set)" {
+		t.Errorf("missing plain field should read (not set), got %+v", missing[1])
+	}
+}
+
+func TestCredentialLinesUnknownProviderMasksEverything(t *testing.T) {
+	reset := stubAppDeps()
+	defer reset()
+
+	p := config.Profile{Provider: "mystery", Credentials: map[string]interface{}{"zeta": "zz-1111", "alpha": "aa-2222"}}
+	lines := credentialLines(p)
+	if len(lines) != 2 || lines[0].label != "Alpha" || lines[0].value != "****2222" || lines[1].label != "Zeta" || lines[1].value != "****1111" {
+		t.Fatalf("expected sorted, fully masked lines, got %+v", lines)
 	}
 }
 

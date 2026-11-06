@@ -7,6 +7,7 @@ import (
 
 	"github.com/ppikrorngarn/ttscli/internal/cli"
 	"github.com/ppikrorngarn/ttscli/internal/config"
+	"github.com/ppikrorngarn/ttscli/internal/tts"
 )
 
 func runProfileCommand(cfg cli.Config, stdout io.Writer) error {
@@ -68,6 +69,7 @@ func runProfileList(stdout io.Writer) error {
 	fmt.Fprintln(stdout)
 	fmt.Fprintln(stdout, "Manage profiles:")
 	fmt.Fprintln(stdout, "  ttscli profile create --provider <provider> --name <name> --api-key <key>")
+	fmt.Fprintln(stdout, "  ttscli profile create --provider <provider> --name <name> -c <key>=<value> ...")
 	fmt.Fprintln(stdout, "  ttscli profile use <provider:name>")
 	fmt.Fprintln(stdout, "  ttscli profile get <provider:name>")
 	fmt.Fprintln(stdout, "  ttscli profile delete <provider:name>")
@@ -76,13 +78,10 @@ func runProfileList(stdout io.Writer) error {
 
 func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
 	if strings.TrimSpace(cfg.Provider) == "" {
-		return fmt.Errorf("--provider is required. Specify the TTS provider (gcp, aws, azure, ibm, alibaba)")
+		return fmt.Errorf("--provider is required. Available providers: %s", strings.Join(providerNames(), ", "))
 	}
 	if strings.TrimSpace(cfg.ProfileName) == "" {
 		return fmt.Errorf("--name is required. Choose a unique name for this profile")
-	}
-	if cfg.APIKey == "" {
-		return fmt.Errorf("--api-key is required. Get your API key from the provider's console")
 	}
 
 	normalizedProvider := strings.ToLower(strings.TrimSpace(cfg.Provider))
@@ -91,7 +90,16 @@ func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := validateProfileCreateProvider(providerName); err != nil {
+	if err := validateProviderName(providerName); err != nil {
+		return err
+	}
+	spec, ok := lookupSpec(providerName)
+	if !ok {
+		return fmt.Errorf("provider %q is registered but has no spec", providerName)
+	}
+
+	creds, err := collectCreateCredentials(cfg, spec)
+	if err != nil {
 		return err
 	}
 
@@ -105,12 +113,10 @@ func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
 	}
 
 	profile := config.Profile{
-		Provider: providerName,
-		Name:     profileName,
-		Credentials: map[string]interface{}{
-			"apiKey": cfg.APIKey,
-		},
-		Defaults: make(map[string]string),
+		Provider:    providerName,
+		Name:        profileName,
+		Credentials: creds,
+		Defaults:    make(map[string]string),
 	}
 
 	if cfg.DefaultVoice != "" {
@@ -127,12 +133,16 @@ func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
 	ctx, stop := newAppCtx()
 	defer stop()
 
-	voices, err := provider.ListVoices(ctx, "en-US")
+	checkLang := spec.DefaultLang
+	if checkLang == "" {
+		checkLang = "en-US"
+	}
+	voices, err := provider.ListVoices(ctx, checkLang)
 	if err != nil {
 		return fmt.Errorf("validate provider: %w", err)
 	}
 	if len(voices) == 0 {
-		return fmt.Errorf("provider returned no voices. Please check your API key and permissions")
+		return fmt.Errorf("provider returned no voices. Please check your credentials and permissions")
 	}
 
 	appCfg.Profiles[profileKey] = profile
@@ -157,15 +167,28 @@ func runProfileCreate(cfg cli.Config, stdout io.Writer) error {
 	return nil
 }
 
-func validateProfileCreateProvider(provider string) error {
-	switch provider {
-	case "gcp":
-		return nil
-	case "aws", "azure", "ibm", "alibaba":
-		return fmt.Errorf("provider %q is not yet implemented. Available today: gcp", provider)
-	default:
-		return fmt.Errorf("unsupported provider %q. Supported providers: gcp", provider)
+// collectCreateCredentials merges --api-key and --credential flags and checks
+// that every field the provider declares is present. Undeclared keys are kept
+// so a profile can carry provider-specific extras, but declared ones win.
+func collectCreateCredentials(cfg cli.Config, spec tts.Spec) (map[string]interface{}, error) {
+	creds := make(map[string]interface{}, len(cfg.Credentials)+1)
+	for key, value := range cfg.Credentials {
+		creds[key] = value
 	}
+	if cfg.APIKey != "" {
+		if _, dup := creds["apiKey"]; dup {
+			return nil, fmt.Errorf("apiKey was given both as --api-key and --credential apiKey=...; use one of them")
+		}
+		creds["apiKey"] = cfg.APIKey
+	}
+	for _, field := range spec.Credentials {
+		raw, ok := creds[field.Key]
+		value, isString := raw.(string)
+		if !ok || !isString || strings.TrimSpace(value) == "" {
+			return nil, missingCredentialError(field, false)
+		}
+	}
+	return creds, nil
 }
 
 func runProfileDelete(cfg cli.Config, stdout io.Writer) error {
@@ -307,7 +330,9 @@ func runProfileGet(cfg cli.Config, stdout io.Writer) error {
 	fmt.Fprintf(stdout, "Profile Key:   %s%s\n", profileKey, isActive)
 	fmt.Fprintf(stdout, "Provider:      %s\n", profile.Provider)
 	fmt.Fprintf(stdout, "Name:          %s\n", profile.Name)
-	fmt.Fprintf(stdout, "API Key:       %s\n", maskAPIKey(resolveProfileAPIKey(profile)))
+	for _, line := range credentialLines(profile) {
+		fmt.Fprintf(stdout, "%-14s %s\n", line.label+":", line.value)
+	}
 	if voice, ok := profile.Defaults["voice"]; ok {
 		fmt.Fprintf(stdout, "Default Voice: %s\n", voice)
 	} else {

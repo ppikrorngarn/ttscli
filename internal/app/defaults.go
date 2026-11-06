@@ -1,7 +1,9 @@
 package app
 
 import (
+	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/ppikrorngarn/ttscli/internal/cli"
 	"github.com/ppikrorngarn/ttscli/internal/config"
@@ -18,10 +20,66 @@ func resolveProfileDefaults(cfg cli.Config, profile config.Profile) cli.Config {
 	return cfg
 }
 
-// resolveProfileAPIKey extracts API key from profile credentials.
-func resolveProfileAPIKey(profile config.Profile) string {
-	if apiKey, ok := profile.Credentials["apiKey"].(string); ok {
-		return strings.TrimSpace(apiKey)
+// credentialLabel turns a credential key into a display label: "apiKey" -> "API Key",
+// "region" -> "Region", "subscriptionKey" -> "Subscription Key".
+func credentialLabel(key string) string {
+	if key == "apiKey" {
+		return "API Key"
+	}
+	var b strings.Builder
+	for i, r := range key {
+		if i == 0 {
+			b.WriteRune(unicode.ToUpper(r))
+			continue
+		}
+		if unicode.IsUpper(r) {
+			b.WriteRune(' ')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// credentialLine is one "Label: value" pair ready for display.
+type credentialLine struct {
+	label string
+	value string
+}
+
+// credentialLines renders every credential the provider declares, masking
+// secrets. For a provider the registry does not know, every value is masked.
+func credentialLines(profile config.Profile) []credentialLine {
+	spec, known := lookupSpec(profile.Provider)
+	if !known {
+		keys := make([]string, 0, len(profile.Credentials))
+		for k := range profile.Credentials {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		lines := make([]credentialLine, 0, len(keys))
+		for _, k := range keys {
+			lines = append(lines, credentialLine{credentialLabel(k), maskAPIKey(credentialString(profile, k))})
+		}
+		return lines
+	}
+	lines := make([]credentialLine, 0, len(spec.Credentials))
+	for _, field := range spec.Credentials {
+		value := credentialString(profile, field.Key)
+		switch {
+		case field.Secret:
+			value = maskAPIKey(value)
+		case strings.TrimSpace(value) == "":
+			value = "(not set)"
+		}
+		lines = append(lines, credentialLine{credentialLabel(field.Key), value})
+	}
+	return lines
+}
+
+// credentialString returns the trimmed string value stored under key, or "".
+func credentialString(profile config.Profile, key string) string {
+	if raw, ok := profile.Credentials[key].(string); ok {
+		return strings.TrimSpace(raw)
 	}
 	return ""
 }
