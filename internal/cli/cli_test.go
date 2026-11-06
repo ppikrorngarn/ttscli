@@ -449,6 +449,62 @@ func TestParseCLIArgsProfileCreate(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsProfileCreateCredentials(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"profile", "create", "-P", "fake", "-n", "work", "--credential", "token=abc", "-c", "region=eastus"}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Credentials["token"] != "abc" || cfg.Credentials["region"] != "eastus" || len(cfg.Credentials) != 2 {
+		t.Errorf("unexpected credentials: %v", cfg.Credentials)
+	}
+	if cfg.APIKey != "" {
+		t.Errorf("api key should be empty when only --credential is used, got %q", cfg.APIKey)
+	}
+}
+
+func TestParseCLIArgsProfileCreateCredentialValueMayContainEquals(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := ParseArgs([]string{"profile", "create", "-P", "fake", "-n", "work", "-c", "token=a=b=="}, &stderr)
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if cfg.Credentials["token"] != "a=b==" {
+		t.Errorf("expected value split on first '=' only, got %q", cfg.Credentials["token"])
+	}
+}
+
+func TestParseCLIArgsProfileCreateCredentialBadFormat(t *testing.T) {
+	for _, raw := range []string{"token", "=abc", "  =abc"} {
+		var stderr bytes.Buffer
+		_, err := ParseArgs([]string{"profile", "create", "-P", "fake", "-n", "work", "-c", raw}, &stderr)
+		if err == nil || !strings.Contains(err.Error(), "Expected key=value") {
+			t.Errorf("%q: expected key=value format error, got: %v", raw, err)
+		}
+	}
+}
+
+func TestParseCLIArgsProfileCreateCredentialDuplicateKey(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := ParseArgs([]string{"profile", "create", "-P", "fake", "-n", "work", "-c", "token=a", "-c", "token=b"}, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "more than once") {
+		t.Fatalf("expected duplicate key error, got: %v", err)
+	}
+}
+
+func TestCredentialFlagString(t *testing.T) {
+	var m map[string]string
+	f := credentialFlag{&m}
+	if got := f.String(); got != "" {
+		t.Errorf("expected empty String() for nil map, got %q", got)
+	}
+	_ = f.Set("b=2")
+	_ = f.Set("a=1")
+	if got := f.String(); got != "a=1,b=2" {
+		t.Errorf("expected sorted key=value list, got %q", got)
+	}
+}
+
 func TestParseCLIArgsProfileDelete(t *testing.T) {
 	var stderr bytes.Buffer
 	cfg, err := ParseArgs([]string{"profile", "delete", "gcp:default"}, &stderr)

@@ -26,7 +26,7 @@ func TestRunCompletionBash(t *testing.T) {
 		!strings.Contains(out, "speak say save voices setup doctor completion profile") ||
 		!strings.Contains(out, "--text -t --lang -l --voice -v --profile -p --help") ||
 		!strings.Contains(out, "list create delete use get") ||
-		!strings.Contains(out, "--provider -P --name -n --api-key -k --voice -v") {
+		!strings.Contains(out, "--provider -P --name -n --api-key -k --credential -c --voice -v") {
 		t.Fatalf("unexpected completion output: %q", out)
 	}
 }
@@ -50,7 +50,8 @@ func TestRunCompletionZsh(t *testing.T) {
 		!strings.Contains(out, "profile:Manage TTS provider profiles") ||
 		!strings.Contains(out, "'-t[Text to convert to speech]:text:'") ||
 		!strings.Contains(out, "_values 'subcommand' list create delete use get") ||
-		!strings.Contains(out, "'--api-key[API key]:key:'") {
+		!strings.Contains(out, "'--api-key[API key]:key:'") ||
+		!strings.Contains(out, "'*--credential[Provider credential key=value]:credential:'") {
 		t.Fatalf("unexpected completion output: %q", out)
 	}
 }
@@ -74,7 +75,8 @@ func TestRunCompletionFish(t *testing.T) {
 		!strings.Contains(out, "-a profile") ||
 		!strings.Contains(out, "-l text -s t") ||
 		!strings.Contains(out, "-l profile -s p") ||
-		!strings.Contains(out, "-l api-key -s k") {
+		!strings.Contains(out, "-l api-key -s k") ||
+		!strings.Contains(out, "-l credential -s c") {
 		t.Fatalf("unexpected completion output: %q", out)
 	}
 }

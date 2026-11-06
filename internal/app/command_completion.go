@@ -55,7 +55,7 @@ _ttscli_completion() {
       else
         case "${words[2]}" in
           create)
-            COMPREPLY=( $(compgen -W "--provider -P --name -n --api-key -k --voice -v" -- "${cur}") )
+            COMPREPLY=( $(compgen -W "--provider -P --name -n --api-key -k --credential -c --voice -v" -- "${cur}") )
             ;;
         esac
       fi
@@ -110,6 +110,8 @@ _ttscli() {
     '--name[Profile name]:name:'
     '-k[API key]:key:'
     '--api-key[API key]:key:'
+    '*-c[Provider credential key=value]:credential:'
+    '*--credential[Provider credential key=value]:credential:'
     '-v[Default voice]:voice:'
     '--voice[Default voice]:voice:'
   )
@@ -185,6 +187,7 @@ complete -c ttscli -f -n "__fish_seen_subcommand_from profile; and not __fish_se
 complete -c ttscli -f -n "__fish_seen_subcommand_from create" -l provider -s P -d "Provider name"
 complete -c ttscli -f -n "__fish_seen_subcommand_from create" -l name -s n -d "Profile name"
 complete -c ttscli -f -n "__fish_seen_subcommand_from create" -l api-key -s k -d "API key"
+complete -c ttscli -f -n "__fish_seen_subcommand_from create" -l credential -s c -d "Provider credential key=value"
 complete -c ttscli -f -n "__fish_seen_subcommand_from create" -l voice -s v -d "Default voice"
 
 complete -c ttscli -f -n "__fish_seen_subcommand_from speak say" -l text -s t -d "Text to convert to speech"
