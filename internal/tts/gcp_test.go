@@ -29,7 +29,7 @@ func TestTTSClientSynthesizeSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient("k", srv.Client())
+	c := NewGCPClient("k", srv.Client())
 	c.baseURL = srv.URL
 
 	got, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
@@ -64,7 +64,7 @@ func TestTTSClientSynthesizeRequestPayload(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient("k", srv.Client())
+	c := NewGCPClient("k", srv.Client())
 	c.baseURL = srv.URL
 
 	_, err := c.Synthesize(context.Background(), "hello world", "en-GB", "en-GB-Neural2-B", AudioEncodingMP3)
@@ -80,7 +80,7 @@ func TestTTSClientSynthesizeErrorStatus(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient("k", srv.Client())
+	c := NewGCPClient("k", srv.Client())
 	c.baseURL = srv.URL
 
 	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
@@ -99,7 +99,7 @@ func TestTTSClientSynthesizeErrorStatusStructuredMessage(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient("k", srv.Client())
+	c := NewGCPClient("k", srv.Client())
 	c.baseURL = srv.URL
 
 	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
@@ -117,7 +117,7 @@ func TestTTSClientSynthesizeInvalidBase64(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient("k", srv.Client())
+	c := NewGCPClient("k", srv.Client())
 	c.baseURL = srv.URL
 
 	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
@@ -134,7 +134,7 @@ func TestTTSClientSynthesizeInvalidJSON(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient("k", srv.Client())
+	c := NewGCPClient("k", srv.Client())
 	c.baseURL = srv.URL
 
 	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
@@ -151,7 +151,7 @@ func TestTTSClientSynthesizeEmptyAudioContent(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient("k", srv.Client())
+	c := NewGCPClient("k", srv.Client())
 	c.baseURL = srv.URL
 
 	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
@@ -173,7 +173,7 @@ func TestTTSClientListVoicesSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient("k", srv.Client())
+	c := NewGCPClient("k", srv.Client())
 	c.baseURL = srv.URL
 
 	voices, err := c.ListVoices(context.Background(), "en-GB")
@@ -195,7 +195,7 @@ func TestTTSClientListVoicesOmitsLanguageCodeWhenEmpty(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient("k", srv.Client())
+	c := NewGCPClient("k", srv.Client())
 	c.baseURL = srv.URL
 
 	_, err := c.ListVoices(context.Background(), "")
@@ -212,7 +212,7 @@ func TestTTSClientListVoicesInvalidJSON(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient("k", srv.Client())
+	c := NewGCPClient("k", srv.Client())
 	c.baseURL = srv.URL
 
 	_, err := c.ListVoices(context.Background(), "en-US")
@@ -222,7 +222,7 @@ func TestTTSClientListVoicesInvalidJSON(t *testing.T) {
 }
 
 func TestTTSClientBuildRequestURLInvalidBaseURL(t *testing.T) {
-	c := NewClient("k", nil)
+	c := NewGCPClient("k", nil)
 	c.baseURL = "://invalid-base-url"
 
 	_, err := c.buildRequestURL(apiPathVoices, nil)
@@ -232,7 +232,7 @@ func TestTTSClientBuildRequestURLInvalidBaseURL(t *testing.T) {
 }
 
 func TestTTSClientBuildRequestURLEncodesQueryParams(t *testing.T) {
-	c := NewClient("k", nil)
+	c := NewGCPClient("k", nil)
 	c.baseURL = "https://example.com"
 
 	extra := url.Values{}
@@ -257,7 +257,7 @@ func TestTTSClientBuildRequestURLEncodesQueryParams(t *testing.T) {
 
 func TestTTSClientSynthesizeHTTPCallError(t *testing.T) {
 	const apiKey = "tts-sentinel-api-key-12345"
-	c := NewClient(apiKey, &http.Client{
+	c := NewGCPClient(apiKey, &http.Client{
 		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 			if got := req.Header.Get("X-Goog-Api-Key"); got != apiKey {
 				t.Fatalf("unexpected api key header: %q", got)
@@ -277,7 +277,7 @@ func TestTTSClientSynthesizeHTTPCallError(t *testing.T) {
 }
 
 func TestTTSClientSynthesizeReadResponseError(t *testing.T) {
-	c := NewClient("k", &http.Client{
+	c := NewGCPClient("k", &http.Client{
 		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 			assertAPIKeyHeader(t, req)
 			return &http.Response{
@@ -302,7 +302,7 @@ func TestTTSClientListVoicesErrorStatus(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient("k", srv.Client())
+	c := NewGCPClient("k", srv.Client())
 	c.baseURL = srv.URL
 
 	_, err := c.ListVoices(context.Background(), "en-US")
@@ -321,7 +321,7 @@ func TestTTSClientListVoicesErrorStatusTopLevelMessage(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient("k", srv.Client())
+	c := NewGCPClient("k", srv.Client())
 	c.baseURL = srv.URL
 
 	_, err := c.ListVoices(context.Background(), "en-US")
@@ -340,7 +340,7 @@ func TestTTSClientListVoicesErrorStatusStringError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient("k", srv.Client())
+	c := NewGCPClient("k", srv.Client())
 	c.baseURL = srv.URL
 
 	_, err := c.ListVoices(context.Background(), "en-US")
@@ -360,7 +360,7 @@ func TestTTSClientSynthesizeErrorStatusDoesNotLeakResponseBody(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient("k", srv.Client())
+	c := NewGCPClient("k", srv.Client())
 	c.baseURL = srv.URL
 
 	_, err := c.Synthesize(context.Background(), "hello", "en-US", "en-US-Neural2-F", AudioEncodingMP3)
