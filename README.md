@@ -117,9 +117,10 @@ This tool allows you to easily synthesize speech, save it to an MP3 file, or pla
    ```bash
    ttscli setup
    ```
-    This guided flow prompts for API key, default language, and default voice, validates them, and can run a sound check.
-    Press Enter on language/voice prompts to use built-in defaults: `en-US` and `en-US-Neural2-F`.
-    **Note:** The API key input is masked (hidden) as you type or paste for security.
+    This guided flow asks for the provider's credentials (for Google Cloud: an API key), a default language and a default voice, validates them, and can run a sound check.
+    Press Enter on language/voice prompts to use the provider's built-in defaults (Google Cloud: `en-US` and `en-US-Neural2-F`).
+    When more than one provider is built in, setup first asks which one to use.
+    **Note:** Secret inputs such as API keys are masked (hidden) as you type or paste.
 
 ### Contributor Setup
 
@@ -136,6 +137,16 @@ If `GOBIN` is empty, that usually means `$(go env GOPATH)/bin`.
 
 The `export PATH=...` line above only affects the current shell session.
 If you use these tools often, add the same line to your shell profile.
+
+#### Adding a provider
+
+Providers are registered in `internal/tts/registry.go`. The app layer (`setup`, `profile`, `doctor`, `speak`) never names a provider; it reads everything from the provider's `Spec`. To add one:
+
+1. Implement the `tts.Provider` interface in a new file, e.g. `internal/tts/azure.go`, using plain `net/http` like `gcp.go` does.
+2. Add a `tts.Spec` for it to the `registry` map: name, display name, the credential fields it needs (each with a prompt, a help line and whether it is secret), default language and voice, and a constructor.
+3. Test it with `net/http/httptest` the way `gcp_test.go` does. `registry_test.go` shows how to exercise the registry with a fake provider.
+
+That is the whole change: `setup` will prompt for the new fields, `profile create` will accept them via `--credential`, and `profile get` will mask the secret ones.
 
 For contribution and licensing details, see:
 - [CONTRIBUTING.md](./CONTRIBUTING.md)
@@ -256,7 +267,7 @@ Prefer managing profiles via the `ttscli profile` subcommands (see [Command Refe
 | --- | --- | --- | --- |
 | `--text` | string | `""` | Required for `speak`. Alias: `-t`. |
 | `--lang` | string | `en-US` | Language code for speak (or profile default). Alias: `-l`. |
-| `--voice` | string | `en-US-Neural2-F` | Voice name for synth (or profile default). Alias: `-v`. |
+| `--voice` | string | `""` | Voice name for synth. Falls back to the profile default, then the provider default. Alias: `-v`. |
 | `--profile` | string | `""` | Profile to use (e.g., `gcp:default`). Alias: `-p`. |
 
 ### `save` Flags
@@ -266,7 +277,7 @@ Prefer managing profiles via the `ttscli profile` subcommands (see [Command Refe
 | `--text` | string | `""` | Required for `save`. Alias: `-t`. |
 | `--out` | string | `""` | Required output MP3 path. Alias: `-o`. |
 | `--lang` | string | `en-US` | Language code for save (or profile default). Alias: `-l`. |
-| `--voice` | string | `en-US-Neural2-F` | Voice name for save (or profile default). Alias: `-v`. |
+| `--voice` | string | `""` | Voice name for save. Falls back to the profile default, then the provider default. Alias: `-v`. |
 | `--profile` | string | `""` | Profile to use (e.g., `gcp:default`). Alias: `-p`. |
 
 ### `voices` Flags
@@ -282,8 +293,11 @@ Prefer managing profiles via the `ttscli profile` subcommands (see [Command Refe
 | --- | --- | --- | --- |
 | `--provider` | string | `""` | Required. Provider name (e.g., `gcp`). Alias: `-P`. |
 | `--name` | string | `""` | Required. Unique profile name (e.g., `default`, `work`). Alias: `-n`. |
-| `--api-key` | string | `""` | Required. API key for the provider. Alias: `-k`. |
+| `--api-key` | string | `""` | API key for the provider. Shorthand for `--credential apiKey=KEY`. Alias: `-k`. |
+| `--credential` | `key=value` | none | Any credential the provider declares; repeat for several (e.g. `-c region=eastus`). Alias: `-c`. |
 | `--voice` | string | `""` | Optional default voice to seed into the profile. Alias: `-v`. |
+
+Every credential the chosen provider declares must be supplied. Google Cloud needs only `apiKey`, so `--api-key` is enough. Passing the same key through both `--api-key` and `--credential` is an error.
 
 ### `profile set` Flags
 
@@ -378,7 +392,7 @@ ttscli voices -l en-GB
 
 ### Voice and Language Selection
 
-By default, the CLI uses a female US English voice (`en-US-Neural2-F`). You can customize this using the `--lang` and `--voice` flags.
+Voice resolution is: `--voice` flag, then the profile's default voice, then the provider's default for the language (Google Cloud: `en-US-Neural2-F` for `en-US`). Customize with the `--lang` and `--voice` flags or `ttscli profile set`.
 
 **Example: British Male Voice:**
 ```bash
@@ -413,13 +427,16 @@ The codebase is organized into a thin `cmd/` entry point and focused `internal/`
 ```
 cmd/ttscli/          Binary entry point. Injects version/commit/date via ldflags at build time.
 internal/cli/        Argument parsing. Owns the Config struct and all mode/subcommand constants.
-internal/app/        Command handlers (setup, doctor, profile, completion). Orchestrates the run
-                     flow: parse args -> resolve profile -> create provider -> execute.
+internal/app/        Command handlers (setup, doctor, profile, completion) and the voices table.
+                     Orchestrates the run flow: parse args -> resolve profile -> create provider
+                     via the registry -> execute. Knows no provider by name.
 internal/config/     JSON config file I/O. Profile CRUD. Two-step path resolution (local next
                      to the binary, falling back to the user config directory).
 internal/player/     Cross-platform audio playback. macOS: afplay. Linux: mpg123/paplay/ffplay.
                      Windows: mpg123 or ffplay (requires install).
-internal/tts/        Provider interface, GCP HTTP client, voice listing, PrintVoices helper.
+internal/tts/        Provider interface and shared types (provider.go), the provider registry
+                     with per-provider credential specs (registry.go), and one file per
+                     provider implementation (gcp.go).
 ```
 
 Packages under `internal/` use small, package-level function variables (e.g. `readFile`, `writeFile`, `lookupEnv`) for dependency injection, so tests can stub the filesystem, environment, and HTTP calls without real I/O.
